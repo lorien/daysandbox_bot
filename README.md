@@ -1,7 +1,7 @@
 ## DaySandBox Bot Help
 
 This bot implements simple anti-spam technique - it deletes all posts which:
-1. contains link or mention not the group's member username
+1. contains link or mentions not-the-group's member username or forwarded from somewhere
 2. AND posted by the user who has joined the group less than 24 hours ago
 
 This bot does not ban anybody, it only deletes messages by the rules listed above.

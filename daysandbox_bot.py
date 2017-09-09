@@ -45,6 +45,8 @@ def save_event(event_type, msg, db):
         'username': msg.from_user.username,
         'date': datetime.utcnow(),
         'text': msg.text,
+        'forward_from_id': (msg.forward_from.id if msg.forward_from else None),
+        'forward_from_username': (msg.forward_from.username if msg.forward_from else None),
     })
 
 
@@ -103,19 +105,24 @@ def create_bot(api_token, db):
 
     @bot.message_handler(func=lambda x: True)
     def handle_sticker(msg):
-        print(msg.text)
-        print(msg.entities or [])
+        try:
+            join_date = joined_users[(msg.chat.id, msg.from_user.id)]
+        except KeyError:
+            return
+        if datetime.utcnow() - timedelta(hours=24) > join_date:
+            return
         to_delete = False
         for ent in (msg.entities or []):
             if ent.type == 'url': 
-                try:
-                    join_date = joined_users[(msg.chat.id, msg.from_user.id)]
-                except KeyError:
-                    pass
-                else:
-                    if datetime.utcnow() - timedelta(hours=24) < join_date:
-                        bot.delete_message(msg.chat.id, msg.message_id)
-                        save_event('delete_msg', msg, db)
+                to_delete = True
+                break
+        if not to_delete:
+            if msg.forward_from:
+                to_delete = True
+        if to_delete:
+            bot.delete_message(msg.chat.id, msg.message_id)
+            save_event('delete_msg', msg, db)
+
     return bot
 
 
