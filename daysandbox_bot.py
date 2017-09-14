@@ -115,6 +115,7 @@ def create_bot(api_token, db):
     bot = telebot.TeleBot(api_token)
     joined_users = load_joined_users(db)
     group_config = load_group_config(db)
+    delete_events = {}
 
     @bot.message_handler(content_types=['new_chat_members'])
     def handle_new_chat_member(msg):
@@ -287,9 +288,16 @@ def create_bot(api_token, db):
                 from_user = msg.from_user.first_name
             else:
                 from_user = '#%d' % msg.from_user.id
+            event_key = (msg.chat.id, msg.from_user.id)
             if get_setting(group_config, msg.chat.id, 'publog', True):
-                ret = 'Removed msg from %s. Reason: new user + %s' % (from_user, reason)
-                bot.send_message(msg.chat.id, ret, parse_mode='HTML')
+                # Notify about spam from same user only one time per hour
+                if (
+                        event_key not in delete_events
+                        or delete_events[event_key] < datetime.utcnow() - timedelta(hours=1)
+                    ):
+                    ret = 'Removed msg from %s. Reason: new user + %s' % (from_user, reason)
+                    bot.send_message(msg.chat.id, ret, parse_mode='HTML')
+            delete_events[event_key] = datetime.utcnow()
 
             ids = set([GLOBAL_CHANNEL_ID])
             channel_id = get_setting(group_config, msg.chat.id, 'log_channel_id')
