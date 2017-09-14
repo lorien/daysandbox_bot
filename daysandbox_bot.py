@@ -305,13 +305,13 @@ def create_bot(api_token, db):
                         else '#%d' % msg.chat.id
                     )
                     bot.send_message(
-                        channel_id,
+                        chid,
                         'Message deleted from %s\n```\n%s\n```' % (from_chat, dump),
                         parse_mode='markdown'
                     )
                 except Exception as ex:
                     logging.error(
-                        'Failed to send notification to channel [%d]' % channel_id,
+                        'Failed to send notification to channel [%d]' % chid,
                         exc_info=ex
                     )
 
