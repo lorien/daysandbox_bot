@@ -36,8 +36,8 @@ The source code is available at [github.com/lorien/daysandbox_bot](https://githu
 You can contact author of the bot at @madspectator
 """
 
-def save_event(event_type, msg, db):
-    db.event.save({
+def save_event(event_type, msg, db, **kwargs):
+    event = {
         'type': event_type,
         'chat_id': msg.chat.id,
         'chat_username': msg.chat.username,
@@ -47,7 +47,9 @@ def save_event(event_type, msg, db):
         'text': msg.text,
         'forward_from_id': (msg.forward_from.id if msg.forward_from else None),
         'forward_from_username': (msg.forward_from.username if msg.forward_from else None),
-    })
+    }
+    event.update(**kwargs)
+    db.event.save(event)
 
 
 def create_bot(api_token, db):
@@ -115,13 +117,25 @@ def create_bot(api_token, db):
         for ent in (msg.entities or []):
             if ent.type == 'url': 
                 to_delete = True
+                reason = 'external link'
+                break
+            if ent.type == 'mention':
+                to_delete = True
+                reason = 'link to @&#8204;username'
                 break
         if not to_delete:
             if msg.forward_from:
+                reason = 'forwarded'
                 to_delete = True
         if to_delete:
             bot.delete_message(msg.chat.id, msg.message_id)
-            save_event('delete_msg', msg, db)
+            save_event('delete_msg', msg, db, reason=reason)
+            if msg.from_user.username:
+                from_user = msg.from_user.username
+            else:
+                from_user = '#%d' % msg.from_user.id
+            ret = 'Removed msg from %s. Reason: new user + %s' % (from_user, reason)
+            bot.send_message(msg.chat.id, ret, parse_mode='HTML')
 
     return bot
 
