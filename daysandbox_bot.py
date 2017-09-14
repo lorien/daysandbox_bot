@@ -1,5 +1,7 @@
 #!/usr/bin/env python
+import re
 from collections import Counter
+import jsondate
 import json
 import logging
 import telebot
@@ -29,35 +31,90 @@ other groups that are not protected by [@daysandbox_bot](https://t.me/daysandbox
 
 /help - display this help message
 /stat - display simple statistics about number of deleted messages
+/set publog=[yes|no] - enable/disable messages to group about deleted posts
+
+*How to log deleted messages to private channel*
+Add bot to the channel as admin. Write "/setlog" to the channel. Forward message to the group.
+Write /unsetlog in the group to disable logging to channel.
+
+*Questions, Feedback*
+Support group: [@daysandbox_chat](https://t.me/daysandbox_chat)
 
 *Open Source*
 
 The source code is available at [github.com/lorien/daysandbox_bot](https://github.com/lorien/daysandbox_bot)
-You can contact author of the bot at @madspectator
 """
+SUPERUSER_IDS = set([
+    46284539, # @madspectator
+])
+GROUP_SETTING_KEYS = ('publog', 'log_channel_id')
+GLOBAL_CHANNEL_ID = -1001148916224 
 
-def save_event(event_type, msg, db, **kwargs):
-    event = {
-        'type': event_type,
+def dump_message(msg):
+    return {
         'chat_id': msg.chat.id,
         'chat_username': msg.chat.username,
         'user_id': msg.from_user.id,
-        'username': msg.from_user.username,
+        'user_username': msg.from_user.username,
         'date': datetime.utcnow(),
         'text': msg.text,
         'forward_from_id': (msg.forward_from.id if msg.forward_from else None),
         'forward_from_username': (msg.forward_from.username if msg.forward_from else None),
     }
+
+
+def save_event(db, event_type, msg, **kwargs):
+    event = dump_message(msg)
+    event.update({
+        'type': event_type,
+    })
     event.update(**kwargs)
     db.event.save(event)
 
 
+def load_joined_users(db):
+    ret = {}
+    for user in db.joined_user.find():
+        ret[(user['chat_id'], user['user_id'])] = user['date']
+    return ret
+
+
+def load_group_config(db):
+    ret = {}
+    for item in db.config.find():
+        key = (
+            item['group_id'],
+            item['key'],
+        )
+        ret[key] = item['value']
+    return ret
+
+
+def set_setting(db, group_config, group_id, key, val):
+    assert key in GROUP_SETTING_KEYS
+    db.config.find_one_and_update(
+        {
+            'group_id': group_id,
+            'key': key,
+        },
+        {'$set': {'value': val}},
+        upsert=True,
+    )
+    group_config[(group_id, key)] = val
+
+
+def get_setting(group_config, group_id, key, default=None):
+    assert key in GROUP_SETTING_KEYS
+    try:
+        return group_config[(group_id, key)]
+    except KeyError:
+        return default
+
+
 def create_bot(api_token, db):
     bot = telebot.TeleBot(api_token)
-
-    joined_users = {}
-    for user in db.joined_user.find():
-        joined_users[(user['chat_id'], user['user_id'])] = user['date']
+    joined_users = load_joined_users(db)
+    group_config = load_group_config(db)
 
     @bot.message_handler(content_types=['new_chat_members'])
     def handle_new_chat_member(msg):
@@ -95,25 +152,114 @@ def create_bot(api_token, db):
             num = 0
             for event in db.event.find(query):
                 num += 1
+                key  = (
+                    '@%s' % event['chat_username'] if event['chat_username']
+                    else '#%d' % event['chat_id']
+                )
                 if day == today:
-                    top_today[event['chat_username']] += 1
-                top_week[event['chat_username']] += 1
+                    top_today[key] += 1
+                top_week[key] += 1
             days.insert(0, num)
         ret = 'Recent 7 days: %s' % ' | '.join([str(x) for x in days])
-        ret += '\nTop today: %s' % ', '.join('%s (%d)' % x for x in top_today.most_common(5)) 
-        ret += '\nTop week: %s' % ', '.join('%s (%d)' % x for x in top_week.most_common(5)) 
+        ret += '\n\nTop today:\n%s' % '\n'.join('  %s (%d)' % x for x in top_today.most_common(5)) 
+        ret += '\n\nTop week:\n%s' % '\n'.join('  %s (%d)' % x for x in top_week.most_common(5)) 
         bot.reply_to(msg, ret)
 
+    @bot.message_handler(commands=['set', 'get'])
+    def handle_set_get(msg):
+        if not msg.chat.type in ('group', 'supergroup'):
+            bot.reply_to(msg, 'This command have to be called from the group')
+            return
+        re_cmd_set = re.compile(r'^/set (publog)=(.+)$')
+        re_cmd_get = re.compile(r'^/get (publog)()$')
+        if msg.text.startswith('/set'):
+            match = re_cmd_set.match(msg.text)
+            action = 'set'
+        else:
+            match = re_cmd_get.match(msg.text)
+            action = 'get'
+        if not match:
+            bot.reply_to(msg, 'Invalid arguments') 
+            return
+
+        key, val = match.groups()
+
+        admins = bot.get_chat_administrators(msg.chat.id)
+        admin_ids = set([x.user.id for x in admins]) | set(SUPERUSER_IDS)
+        if msg.from_user.id not in admin_ids:
+            bot.reply_to(msg, 'Access denied')
+            return
+
+        if action == 'get':
+            bot.reply_to(msg, str(get_setting(group_config, msg.chat.id, key)))
+        else:
+            if key == 'publog':
+                if val in ('yes', 'no'):
+                    val_bool = (val == 'yes')
+                    set_setting(db, group_config, msg.chat.id, key, val_bool)
+                    bot.reply_to(msg, 'Set public_notification to %s for group %s' % (
+                        val_bool,
+                        '@%s' % msg.chat.username if msg.chat.username else '#%d' % msg.chat.id,
+                    ))
+                else:
+                    bot.reply_to(msg, 'Invalid public_notification value. Should be: yes or no')
+            else:
+                bot.reply_to(msg, 'Unknown action: %s' % key)
+
+    @bot.message_handler(commands=['setlog'])
+    def handle_setlog(msg):
+        if not msg.chat.type in ('group', 'supergroup'):
+            bot.reply_to(msg, 'This command have to be called from the group')
+            return
+        if msg.forward_from_chat.type != 'channel':
+            bot.reply_to(msg, 'Command /setlog must be forwarded from channel')
+            return
+        channel = msg.forward_from_chat
+
+        channel_admin_ids = [x.user.id for x in bot.get_chat_administrators(channel.id)]
+        if bot.get_me().id not in channel_admin_ids:
+            bot.reply_to(msg, 'I need to be an admin in log channel')
+            return
+
+        admins = bot.get_chat_administrators(msg.chat.id)
+        admin_ids = set([x.user.id for x in admins]) | set(SUPERUSER_IDS)
+        if msg.from_user.id not in admin_ids:
+            bot.reply_to(msg, 'Access denied')
+            return
+
+        set_setting(db, group_config, msg.chat.id, 'log_channel_id', channel.id)
+        tgid = '@%s' % msg.chat.username if msg.chat.username else '#%d' % msg.chat.id
+        bot.reply_to(msg, 'Set log channel for group %s' % tgid)
+
+    @bot.message_handler(commands=['unsetlog'])
+    def handle_setlog(msg):
+        if not msg.chat.type in ('group', 'supergroup'):
+            bot.reply_to(msg, 'This command have to be called from the group')
+            return
+
+        admins = bot.get_chat_administrators(msg.chat.id)
+        admin_ids = set([x.user.id for x in admins]) | set(SUPERUSER_IDS)
+        if msg.from_user.id not in admin_ids:
+            bot.reply_to(msg, 'Access denied')
+            return
+
+        set_setting(db, group_config, msg.chat.id, 'log_channel_id', None)
+        tgid = '@%s' % msg.chat.username if msg.chat.username else '#%d' % msg.chat.id
+        bot.reply_to(msg, 'Unset log channel for group %s' % tgid)
 
     @bot.message_handler(func=lambda x: True)
-    def handle_sticker(msg):
-        try:
-            join_date = joined_users[(msg.chat.id, msg.from_user.id)]
-        except KeyError:
-            return
-        if datetime.utcnow() - timedelta(hours=24) > join_date:
-            return
+    def handle_any_msg(msg):
         to_delete = False
+        if msg.from_user.username == 'madspectator' and msg.text == 'del':
+            reason = 'debug delete'
+            to_delete = True
+        if not to_delete:
+            try:
+                join_date = joined_users[(msg.chat.id, msg.from_user.id)]
+            except KeyError:
+                return
+            if datetime.utcnow() - timedelta(hours=24) > join_date:
+                return
         for ent in (msg.entities or []):
             if ent.type == 'url': 
                 to_delete = True
@@ -129,16 +275,47 @@ def create_bot(api_token, db):
                 to_delete = True
         if to_delete:
             bot.delete_message(msg.chat.id, msg.message_id)
-            save_event('delete_msg', msg, db, reason=reason)
-            if msg.from_user.username:
-                from_user = msg.from_user.username
+            save_event(db, 'delete_msg', msg, reason=reason)
+            if msg.from_user.first_name and msg.from_user.last_name:
+                from_user = '%s %s' % (
+                    msg.from_user.first_name,
+                    msg.from_user.last_name,
+                )
+            elif msg.from_user.first_name:
+                from_user = msg.from_user.first_name
+            elif msg.from_user.username:
+                from_user = msg.from_user.first_name
             else:
                 from_user = '#%d' % msg.from_user.id
-            ret = 'Removed msg from %s. Reason: new user + %s' % (from_user, reason)
-            bot.send_message(msg.chat.id, ret, parse_mode='HTML')
+            if get_setting(group_config, msg.chat.id, 'publog', True):
+                ret = 'Removed msg from %s. Reason: new user + %s' % (from_user, reason)
+                bot.send_message(msg.chat.id, ret, parse_mode='HTML')
+
+            ids = set([GLOBAL_CHANNEL_ID])
+            channel_id = get_setting(group_config, msg.chat.id, 'log_channel_id')
+            if channel_id:
+                ids.add(channel_id)
+            for chid in ids:
+                try:
+                    msg_dump = dump_message(msg)
+                    msg_dump['reason'] = reason
+                    dump = jsondate.dumps(msg_dump, indent=4, ensure_ascii=False)
+                    from_chat = (
+                        '@%s' % msg.chat.username if msg.chat.username
+                        else '#%d' % msg.chat.id
+                    )
+                    bot.send_message(
+                        channel_id,
+                        'Message deleted from %s\n```\n%s\n```' % (from_chat, dump),
+                        parse_mode='markdown'
+                    )
+                except Exception as ex:
+                    logging.error(
+                        'Failed to send notification to channel [%d]' % channel_id,
+                        exc_info=ex
+                    )
 
     return bot
-
 
 
 def main():
