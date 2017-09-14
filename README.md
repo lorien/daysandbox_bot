@@ -16,10 +16,11 @@ other groups that are not protected by [@daysandbox_bot](https://t.me/daysandbox
 4. Click SAVE button
 5. Enjoy!
 
+## Source Code
+
+Check it here [github.com/lorien/daysandbox_bot](https://github.com/lorien/daysandbox_bot)
+
+
 ## Questions, ideas, bugs
 
 Use [github issues](https://github.com/lorien/daysandbox_bot/issues) or send message to telegram: [@madspectator](https://t.me/madspectator)
-
-## See Also
-
-[@nosticker_bot](https://github.com/lorien/nosticker_bot) - bot that deletes stickers
