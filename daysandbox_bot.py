@@ -277,7 +277,7 @@ def create_bot(api_token, db):
                 reason = 'link to @&#8204;username'
                 break
         if not to_delete:
-            if msg.forward_from:
+            if msg.forward_from or msg.forward_from_chat:
                 reason = 'forwarded'
                 to_delete = True
         if to_delete:
