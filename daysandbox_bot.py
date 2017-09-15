@@ -136,10 +136,14 @@ def create_bot(api_token, db):
 
     @bot.message_handler(commands=['start', 'help'])
     def handle_start_help(msg):
+        if msg.chat.type != 'private':
+            return
         bot.reply_to(msg, HELP, parse_mode='Markdown')
 
     @bot.message_handler(commands=['stat'])
     def handle_stat(msg):
+        if msg.chat.type != 'private':
+            return
         days = []
         top_today = Counter()
         top_week = Counter()
