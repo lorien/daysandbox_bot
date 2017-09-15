@@ -8,6 +8,7 @@ import telebot
 from argparse import ArgumentParser
 from pymongo import MongoClient
 from datetime import datetime, timedelta
+import html
 
 HELP = """*DaySandBox Bot Help*
 
@@ -308,14 +309,15 @@ def create_bot(api_token, db):
                     msg_dump = dump_message(msg)
                     msg_dump['reason'] = reason
                     dump = jsondate.dumps(msg_dump, indent=4, ensure_ascii=False)
+                    dump = html.escape(dump)
                     from_chat = (
                         '@%s' % msg.chat.username if msg.chat.username
                         else '#%d' % msg.chat.id
                     )
                     bot.send_message(
                         chid,
-                        'Message deleted from %s\n```\n%s\n```' % (from_chat, dump),
-                        parse_mode='markdown'
+                        'Message deleted from %s\n<pre>%s</pre>' % (from_chat, dump),
+                        parse_mode='HTML'
                     )
                 except Exception as ex:
                     logging.error(
