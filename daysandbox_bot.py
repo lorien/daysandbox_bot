@@ -253,6 +253,7 @@ def create_bot(api_token, db):
         tgid = '@%s' % msg.chat.username if msg.chat.username else '#%d' % msg.chat.id
         bot.reply_to(msg, 'Unset log channel for group %s' % tgid)
 
+    @bot.edited_message_handler(func=lambda x: True)
     @bot.message_handler(func=lambda x: True)
     def handle_any_msg(msg):
         to_delete = False
