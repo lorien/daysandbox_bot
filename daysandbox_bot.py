@@ -10,6 +10,8 @@ from pymongo import MongoClient
 from datetime import datetime, timedelta
 import html
 
+from util import find_username_links, find_external_links
+
 HELP = """*DaySandBox Bot Help*
 
 This bot implements simple anti-spam technique - it deletes all posts which:
@@ -253,8 +255,14 @@ def create_bot(api_token, db):
         tgid = '@%s' % msg.chat.username if msg.chat.username else '#%d' % msg.chat.id
         bot.reply_to(msg, 'Unset log channel for group %s' % tgid)
 
-    @bot.edited_message_handler(func=lambda x: True)
-    @bot.message_handler(func=lambda x: True)
+    @bot.edited_message_handler(
+        func=lambda x: True,
+        content_types=['text', 'photo', 'video', 'audio', 'sticker', 'document']
+    )
+    @bot.message_handler(
+        func=lambda x: True,
+        content_types=['text', 'photo', 'video', 'audio', 'sticker', 'document']
+    )
     def handle_any_msg(msg):
         to_delete = False
         if msg.from_user.username == 'madspectator' and msg.text == 'del':
@@ -279,6 +287,14 @@ def create_bot(api_token, db):
         if not to_delete:
             if msg.forward_from or msg.forward_from_chat:
                 reason = 'forwarded'
+                to_delete = True
+        if not to_delete:
+            if find_username_links(msg.caption or ''):
+                reason = 'caption @username link'
+                to_delete = True
+        if not to_delete:
+            if find_external_links(msg.caption or ''):
+                reason = 'caption external link'
                 to_delete = True
         if to_delete:
             bot.delete_message(msg.chat.id, msg.message_id)
