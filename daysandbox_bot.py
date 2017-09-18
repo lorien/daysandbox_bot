@@ -295,9 +295,12 @@ def create_bot(api_token, db):
                 reason = 'forwarded'
                 to_delete = True
         if not to_delete:
-            if find_username_links(msg.caption or ''):
-                reason = 'caption @username link'
-                to_delete = True
+            usernames = find_username_links(msg.caption or '')
+            for username in usernames:
+                if username and check_members_username(db, username.replace('@', '')):
+                    reason = 'caption @username link'
+                    to_delete = True
+                    break
         if not to_delete:
             if find_external_links(msg.caption or ''):
                 reason = 'caption external link'
