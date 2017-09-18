@@ -66,6 +66,11 @@ def dump_message(msg):
     }
 
 
+def check_members_username(datab, username):
+    if datab.joined_user.findOne({'user_username': username}):
+        return True
+
+
 def save_event(db, event_type, msg, **kwargs):
     event = dump_message(msg)
     event.update({
@@ -280,9 +285,10 @@ def create_bot(api_token, db):
                 to_delete = True
                 reason = 'external link'
                 break
-            if ent.type == 'mention':
+            if ent.type == 'mention' and not \
+                    check_members_username(db, msg.text[(ent.offset + 1):(ent.offset + 1) + (ent.offset - 1)]):
                 to_delete = True
-                reason = 'link to @&#8204;username'
+                reason = 'link to @username'
                 break
         if not to_delete:
             if msg.forward_from or msg.forward_from_chat:
