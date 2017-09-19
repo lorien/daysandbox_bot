@@ -173,8 +173,8 @@ def create_bot(api_token, db):
                 num += 1
                 if isinstance(event.get('chat'), dict):
                     key  = (
-                        '@%s' % event['chat']['username'] if event['chat']['username']
-                        else '#%d' % event['chat_id']
+                        '@%s' % event['chat']['username'] if event['chat'].get('username')
+                        else '#%d' % event['chat']['id']
                     )
                 else:
                     # OLD event format
@@ -187,8 +187,8 @@ def create_bot(api_token, db):
                 top_week[key] += 1
             days.insert(0, num)
         ret = 'Recent 7 days: %s' % ' | '.join([str(x) for x in days])
-        ret += '\n\nTop today:\n%s' % '\n'.join('  %s (%d)' % x for x in top_today.most_common(10)) 
-        ret += '\n\nTop week:\n%s' % '\n'.join('  %s (%d)' % x for x in top_week.most_common(10)) 
+        ret += '\n\nTop 15 today:\n%s' % '\n'.join('  %s (%d)' % x for x in top_today.most_common(15))
+        ret += '\n\nTop 10 week:\n%s' % '\n'.join('  %s (%d)' % x for x in top_week.most_common(10))
         bot.reply_to(msg, ret)
 
     @bot.message_handler(commands=['set', 'get'])
