@@ -364,7 +364,7 @@ def create_bot(api_token, db):
                 if channel_id:
                     ids.add(channel_id)
                 for chid in ids:
-                    formats = get_setting(group_config, chid, 'logformat', default=['forward'])
+                    formats = get_setting(group_config, chid, 'logformat', default=['simple'])
                     from_chatname = (
                         '@%s' % msg.chat.username if msg.chat.username
                         else '#%d' % msg.chat.id
