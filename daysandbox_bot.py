@@ -50,25 +50,29 @@ The source code is available at [github.com/lorien/daysandbox_bot](https://githu
 SUPERUSER_IDS = set([
     46284539, # @madspectator
 ])
-GROUP_SETTING_KEYS = ('publog', 'log_channel_id')
+GROUP_SETTING_KEYS = ('publog', 'log_channel_id', 'logformat')
 GLOBAL_CHANNEL_ID = -1001148916224 
 
-def dump_message(msg):
-    return {
-        'chat_id': msg.chat.id,
-        'chat_username': msg.chat.username,
-        'user_id': msg.from_user.id,
-        'user_username': msg.from_user.username,
-        'date': datetime.utcnow(),
-        'text': msg.text,
-        'forward_from_id': (msg.forward_from.id if msg.forward_from else None),
-        'forward_from_username': (msg.forward_from.username if msg.forward_from else None),
-    }
+def dump_telegram_object(msg):
+    ret = {}
+    for key, val in msg.__dict__.items():
+        if isinstance(val, (int, str, dict)):
+            pass
+        elif val is None:
+            pass
+        elif isinstance(val, (tuple, list)):
+            val = [dump_telegram_object(x) for x in val]
+        else:
+            val = dump_telegram_object(val)
+        if val is not None:
+            ret[key] = val
+    return ret
 
 
 def save_event(db, event_type, msg, **kwargs):
-    event = dump_message(msg)
+    event = dump_telegram_object(msg)
     event.update({
+        'date': datetime.utcnow(),
         'type': event_type,
     })
     event.update(**kwargs)
@@ -160,10 +164,17 @@ def create_bot(api_token, db):
             num = 0
             for event in db.event.find(query):
                 num += 1
-                key  = (
-                    '@%s' % event['chat_username'] if event['chat_username']
-                    else '#%d' % event['chat_id']
-                )
+                if isinstance(event.get('chat'), dict):
+                    key  = (
+                        '@%s' % event['chat']['username'] if event['chat']['username']
+                        else '#%d' % event['chat_id']
+                    )
+                else:
+                    # OLD event format
+                    key  = (
+                        '@%s' % event['chat_username'] if event['chat_username']
+                        else '#%d' % event['chat_id']
+                    )
                 if day == today:
                     top_today[key] += 1
                 top_week[key] += 1
