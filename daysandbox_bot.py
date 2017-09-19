@@ -40,6 +40,13 @@ other groups that are not protected by [@daysandbox_bot](https://t.me/daysandbox
 Add bot to the channel as admin. Write "/setlog" to the channel. Forward message to the group.
 Write /unsetlog in the group to disable logging to channel.
 
+You can control format of logs with "/setlogformat <format>" command sent to the channel. The argument of this command could be: simple, json, forward or any combination of items delimited by space e.g. "json,forward":
+
+- "simple" - display basic info about message + the
+text of message (or caption text of photo/video)
+- "json" - display full message data in JSON format
+- "forward" - simply forward message to the channel (just message, no data about chat or author).
+
 *Questions, Feedback*
 Support group: [@daysandbox_chat](https://t.me/daysandbox_chat)
 
