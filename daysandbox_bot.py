@@ -15,12 +15,10 @@ from util import find_username_links, find_external_links
 HELP = """*DaySandBox Bot Help*
 
 This bot implements simple anti-spam technique - it deletes all posts which:
-1. contains link or mentions not-the-group's member username or forwarded from somewhere
+1. contains link or @username or forwarded from somewhere
 2. AND posted by the user who has joined the group less than 24 hours ago
 
-This bot does not ban anybody, it only deletes messages by the rules listed above.
-The idea is that in these 24 hours the spamer would be banned anyway for posting spam to
-other groups that are not protected by [@daysandbox_bot](https://t.me/daysandbox_bot).
+This bot does not ban anybody, it only deletes messages by the rules listed above. The idea is that in these 24 hours the spamer would be banned anyway for posting spam to other groups that are not protected by [@daysandbox_bot](https://t.me/daysandbox_bot).
 
 *Usage*
 
@@ -32,20 +30,24 @@ other groups that are not protected by [@daysandbox_bot](https://t.me/daysandbox
 
 *Commands*
 
-/help - display this help message
-/stat - display simple statistics about number of deleted messages
-/set publog=[yes|no] - enable/disable messages to group about deleted posts
+`/help` - display this help message
+`/stat` - display simple statistics about number of deleted messages
+`/set publog=[yes|no]` - enable/disable messages to group about deleted posts
+`/set safe_hours=[int]` - number in hours, how long new users are restricted to post links and forward posts, default is 24 hours (1 day). Allowed value is number between 1 and 168 (7 days).
 
 *How to log deleted messages to private channel*
-Add bot to the channel as admin. Write "/setlog" to the channel. Forward message to the group.
+Add bot to the channel as admin. Write `/setlog` to the channel. Forward message to the group.
+
 Write /unsetlog in the group to disable logging to channel.
 
-You can control format of logs with "/setlogformat <format>" command sent to the channel. The argument of this command could be: simple, json, forward or any combination of items delimited by space e.g. "json,forward":
+You can control format of logs with `/setlogformat <format>` command sent to the channel. The argument of this command could be: simple, json, forward or any combination of items delimited by space e.g. "json,forward":
 
 - "simple" - display basic info about message + the
 text of message (or caption text of photo/video)
 - "json" - display full message data in JSON format
 - "forward" - simply forward message to the channel (just message, no data about chat or author).
+
+Also you can just watch stream of all spam from all groups here: [@daysandbox_log](https://t.me/daysandbox_log)
 
 *Questions, Feedback*
 Support group: [@daysandbox_chat](https://t.me/daysandbox_chat)
@@ -57,8 +59,12 @@ The source code is available at [github.com/lorien/daysandbox_bot](https://githu
 SUPERUSER_IDS = set([
     46284539, # @madspectator
 ])
-GROUP_SETTING_KEYS = ('publog', 'log_channel_id', 'logformat')
+# List of keys allowed to use in set_setting/get_setting
+GROUP_SETTING_KEYS = ('publog', 'log_channel_id', 'logformat', 'safe_hours')
+# Channel of global channel to translate ALL spam
 GLOBAL_CHANNEL_ID = -1001148916224 
+# Default time to reject link and forwarded posts from new user
+DEFAULT_SAFE_HOURS = 24
 
 def dump_telegram_object(msg):
     ret = {}
@@ -196,8 +202,8 @@ def create_bot(api_token, db):
         if not msg.chat.type in ('group', 'supergroup'):
             bot.reply_to(msg, 'This command have to be called from the group')
             return
-        re_cmd_set = re.compile(r'^/set (publog)=(.+)$')
-        re_cmd_get = re.compile(r'^/get (publog)()$')
+        re_cmd_set = re.compile(r'^/set (publog|safe_hours)=(.+)$')
+        re_cmd_get = re.compile(r'^/get (publog|safe_hours)()$')
         if msg.text.startswith('/set'):
             match = re_cmd_set.match(msg.text)
             action = 'set'
@@ -229,6 +235,18 @@ def create_bot(api_token, db):
                     ))
                 else:
                     bot.reply_to(msg, 'Invalid public_notification value. Should be: yes or no')
+            if key == 'safe_hours':
+                if not val.isdigit():
+                    bot.reply_to(msg, 'Invalid safe_hours value. Should be a number')
+                val_int = int(val)
+                days_7 = 24 * 7
+                if val_int < 0 or val_int > days_7:
+                    bot.reply_to(msg, 'Invalid safe_hours value. Should be a number between 1 and %d' % days_7)
+                set_setting(db, group_config, msg.chat.id, key, val_int)
+                bot.reply_to(msg, 'Set safe_hours to %s for group %s' % (
+                    val_int,
+                    '@%s' % msg.chat.username if msg.chat.username else '#%d' % msg.chat.id,
+                ))
             else:
                 bot.reply_to(msg, 'Unknown action: %s' % key)
 
@@ -311,7 +329,8 @@ def create_bot(api_token, db):
                 join_date = joined_users[(msg.chat.id, msg.from_user.id)]
             except KeyError:
                 return
-            if datetime.utcnow() - timedelta(hours=24) > join_date:
+            safe_hours = get_setting(group_config, msg.chat.id, 'safe_hours', DEFAULT_SAFE_HOURS)
+            if datetime.utcnow() - timedelta(hours=safe_hours) > join_date:
                 return
         for ent in (msg.entities or []):
             if ent.type in ('url', 'text_link'):
