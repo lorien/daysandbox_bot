@@ -47,8 +47,6 @@ text of message (or caption text of photo/video)
 - "json" - display full message data in JSON format
 - "forward" - simply forward message to the channel (just message, no data about chat or author).
 
-Also you can just watch stream of all spam from all groups here: [@daysandbox_log](https://t.me/daysandbox_log)
-
 *Questions, Feedback*
 Support group: [@daysandbox_chat](https://t.me/daysandbox_chat)
 
