@@ -80,6 +80,11 @@ def dump_telegram_object(msg):
     return ret
 
 
+def check_members_username(datab, username):
+    if datab.joined_user.findOne({'user_username': username}):
+        return True
+
+
 def save_event(db, event_type, msg, **kwargs):
     event = dump_telegram_object(msg)
     event.update({
@@ -335,18 +340,22 @@ def create_bot(api_token, db):
                 to_delete = True
                 reason = 'external link'
                 break
-            if ent.type == 'mention':
+            if ent.type == 'mention' and not \
+                    check_members_username(db, msg.text[(ent.offset + 1):(ent.offset + 1) + (ent.offset - 1)]):
                 to_delete = True
-                reason = 'link to @&#8204;username'
+                reason = 'link to @username'
                 break
         if not to_delete:
             if msg.forward_from or msg.forward_from_chat:
                 reason = 'forwarded'
                 to_delete = True
         if not to_delete:
-            if find_username_links(msg.caption or ''):
-                reason = 'caption @username link'
-                to_delete = True
+            usernames = find_username_links(msg.caption or '')
+            for username in usernames:
+                if username and check_members_username(db, username.replace('@', '')):
+                    reason = 'caption @username link'
+                    to_delete = True
+                    break
         if not to_delete:
             if find_external_links(msg.caption or ''):
                 reason = 'caption external link'
