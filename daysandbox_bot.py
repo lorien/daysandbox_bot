@@ -314,6 +314,13 @@ def create_bot(api_token, db):
         tgid = '@%s' % msg.chat.username if msg.chat.username else '#%d' % msg.chat.id
         bot.reply_to(msg, 'Unset log channel for group %s' % tgid)
 
+    #@bot.message_handler(
+    #    func=lambda x: True,
+    #    content_types=['text', 'audio', 'document', 'photo', 'sticker', 'video', 'video_note', 'voice', 'location', 'contact', 'new_chat_members', 'left_chat_member', 'new_chat_title', 'new_chat_photo', 'delete_chat_photo', 'group_chat_created', 'supergroup_chat_created', 'channel_chat_created', 'migrate_to_chat_id', 'migrate_from_chat_id', 'pinned_message']
+    #)
+    #def handle_foo(msg):
+    #    import pdb; pdb.set_trace()
+
     @bot.edited_message_handler(
         func=lambda x: True,
         content_types=['text', 'photo', 'video', 'audio', 'sticker', 'document']
@@ -336,7 +343,7 @@ def create_bot(api_token, db):
             if datetime.utcnow() - timedelta(hours=safe_hours) > join_date:
                 return
         for ent in (msg.entities or []):
-            if ent.type in ('url', 'text_link'):
+            if ent.type in ('url', 'text_link', 'hashtag'):
                 to_delete = True
                 reason = 'external link'
                 break
