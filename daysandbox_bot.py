@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from pprint import pprint
 import re
 from collections import Counter
 import jsondate
@@ -163,6 +164,7 @@ def create_bot(api_token, db):
             return
         days = []
         top_today = Counter()
+        top_ystd = Counter()
         top_week = Counter()
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         for x in range(7):
@@ -188,10 +190,13 @@ def create_bot(api_token, db):
                     )
                 if day == today:
                     top_today[key] += 1
+                if day == (today - timedelta(days=1)):
+                    top_ystd[key] += 1
                 top_week[key] += 1
             days.insert(0, num)
         ret = 'Recent 7 days: %s' % ' | '.join([str(x) for x in days])
         ret += '\n\nTop today:\n%s' % '\n'.join('  %s (%d)' % x for x in top_today.most_common())
+        ret += '\n\nTop yesterday:\n%s' % '\n'.join('  %s (%d)' % x for x in top_ystd.most_common())
         ret += '\n\nTop 10 week:\n%s' % '\n'.join('  %s (%d)' % x for x in top_week.most_common(10))
         bot.reply_to(msg, ret)
 
