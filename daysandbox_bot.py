@@ -343,7 +343,7 @@ def create_bot(api_token, db):
             if datetime.utcnow() - timedelta(hours=safe_hours) > join_date:
                 return
         for ent in (msg.entities or []):
-            if ent.type in ('url', 'text_link', 'hashtag'):
+            if ent.type in ('url', 'text_link'):
                 to_delete = True
                 reason = 'external link'
                 break
