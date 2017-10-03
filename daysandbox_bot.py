@@ -11,7 +11,7 @@ from pymongo import MongoClient
 from datetime import datetime, timedelta
 import html
 
-from util import find_username_links, find_external_links
+from util import find_username_links, find_external_links, fetch_user_type
 
 HELP = """*DaySandBox Bot Help*
 
@@ -128,6 +128,30 @@ def get_setting(group_config, group_id, key, default=None):
         return group_config[(group_id, key)]
     except KeyError:
         return default
+
+
+def process_user_type(db, username):
+    username = username.lower()
+    logging.debug('Querying %s type from db' % username)
+    user = db.user.find_one({'username': username})
+    if user:
+        logging.debug('Record found, type is: %s' % user['type'])
+        return user['type']
+    else:
+        logging.debug('Doing network request for type of %s' % username)
+        user_type = fetch_user_type(username)
+        logging.debug('Result is: %s' % user_type)
+        if user_type:
+            db.user.find_one_and_update(
+                {'username': username},
+                {'$set': {
+                    'username': username,
+                    'type': user_type,
+                    'added': datetime.utcnow(),
+                }},
+                upsert=True
+            )
+        return user_type
 
 
 def create_bot(api_token, db):
@@ -348,17 +372,25 @@ def create_bot(api_token, db):
                 reason = 'external link'
                 break
             if ent.type == 'mention':
-                to_delete = True
-                reason = 'link to @&#8204;username'
-                break
+                username = msg.text[ent.offset:ent.offset + ent.length].lstrip('@')
+                user_type = process_user_type(db, username)
+                if user_type in ('group', 'channel'):
+                    to_delete = True
+                    reason = '@-link to group/channel'
+                    break
         if not to_delete:
             if msg.forward_from or msg.forward_from_chat:
                 reason = 'forwarded'
                 to_delete = True
         if not to_delete:
-            if find_username_links(msg.caption or ''):
-                reason = 'caption @username link'
-                to_delete = True
+            usernames = find_username_links(msg.caption or '')
+            for username in usernames:
+                username = username.lstrip('@')
+                user_type = process_user_type(db, username)
+                if user_type in ('group', 'channel'):
+                    reason = 'caption @-link to group/channel'
+                    to_delete = True
+                    break
         if not to_delete:
             if find_external_links(msg.caption or ''):
                 reason = 'caption external link'
@@ -454,6 +486,7 @@ def main():
     else:
         token = config['api_token']
     db = MongoClient()['daysandbox']
+    db.user.create_index('username', unique=True)
     bot = create_bot(token, db)
     bot.polling()
 
