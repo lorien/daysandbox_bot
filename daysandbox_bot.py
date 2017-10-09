@@ -33,8 +33,10 @@ This bot does not ban anybody, it only deletes messages by the rules listed abov
 
 `/help` - display this help message
 `/stat` - display simple statistics about number of deleted messages
-`/set publog=[yes|no]` - enable/disable messages to group about deleted posts
-`/set safe_hours=[int]` - number in hours, how long new users are restricted to post links and forward posts, default is 24 hours (1 day). Allowed value is number between 1 and 168 (7 days).
+`/daysandbox_set publog=[yes|no]` - enable/disable messages to group about deleted posts
+`/daysandbox_set safe_hours=[int]` - number in hours, how long new users are restricted to post links and forward posts, default is 24 hours (1 day). Allowed value is number between 1 and 168 (7 days).
+`/daysandbox_get publog` - get value of `publog` setting
+`/daysandbox_get safe_hours` - get value of `safe_hours` setting
 
 *How to log deleted messages to private channel*
 Add bot to the channel as admin. Write `/setlog` to the channel. Forward message to the group.
@@ -224,19 +226,19 @@ def create_bot(api_token, db):
         ret += '\n\nTop 10 week:\n%s' % '\n'.join('  %s (%d)' % x for x in top_week.most_common(10))
         bot.reply_to(msg, ret)
 
-    @bot.message_handler(commands=['set', 'get'])
+    @bot.message_handler(commands=['daysandbox_set', 'daysandbox_get'])
     def handle_set_get(msg):
         if not msg.chat.type in ('group', 'supergroup'):
             bot.reply_to(msg, 'This command have to be called from the group')
             return
-        re_cmd_set = re.compile(r'^/set (publog|safe_hours)=(.+)$')
-        re_cmd_get = re.compile(r'^/get (publog|safe_hours)()$')
-        if msg.text.startswith('/set'):
+        re_cmd_set = re.compile(r'^/daysandbox_set (publog|safe_hours)=(.+)$')
+        re_cmd_get = re.compile(r'^/daysandbox_get (publog|safe_hours)()$')
+        if msg.text.startswith('/daysandbox_set'):
             match = re_cmd_set.match(msg.text)
-            action = 'set'
+            action = 'SET'
         else:
             match = re_cmd_get.match(msg.text)
-            action = 'get'
+            action = 'GET'
         if not match:
             bot.reply_to(msg, 'Invalid arguments') 
             return
@@ -249,7 +251,7 @@ def create_bot(api_token, db):
             bot.reply_to(msg, 'Access denied')
             return
 
-        if action == 'get':
+        if action == 'GET':
             bot.reply_to(msg, str(get_setting(group_config, msg.chat.id, key)))
         else:
             if key == 'publog':
