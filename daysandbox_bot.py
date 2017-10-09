@@ -262,7 +262,7 @@ def create_bot(api_token, db):
                     ))
                 else:
                     bot.reply_to(msg, 'Invalid public_notification value. Should be: yes or no')
-            if key == 'safe_hours':
+            elif key == 'safe_hours':
                 if not val.isdigit():
                     bot.reply_to(msg, 'Invalid safe_hours value. Should be a number')
                 val_int = int(val)
