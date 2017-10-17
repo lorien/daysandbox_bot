@@ -398,81 +398,78 @@ def create_bot(api_token, db):
                 reason = 'caption external link'
                 to_delete = True
         if to_delete:
-            try:
-                save_event(db, 'delete_msg', msg, reason=reason)
-                if msg.from_user.first_name and msg.from_user.last_name:
-                    from_user = '%s %s' % (
-                        msg.from_user.first_name,
-                        msg.from_user.last_name,
+            bot.delete_message(msg.chat.id, msg.message_id)
+            save_event(db, 'delete_msg', msg, reason=reason)
+            if msg.from_user.first_name and msg.from_user.last_name:
+                from_user = '%s %s' % (
+                    msg.from_user.first_name,
+                    msg.from_user.last_name,
+                )
+            elif msg.from_user.first_name:
+                from_user = msg.from_user.first_name
+            elif msg.from_user.username:
+                from_user = msg.from_user.first_name
+            else:
+                from_user = '#%d' % msg.from_user.id
+            event_key = (msg.chat.id, msg.from_user.id)
+            if get_setting(group_config, msg.chat.id, 'publog', True):
+                # Notify about spam from same user only one time per hour
+                if (
+                        event_key not in delete_events
+                        or delete_events[event_key] < datetime.utcnow() - timedelta(hours=1)
+                    ):
+                    ret = 'Removed msg from %s. Reason: new user + %s' % (from_user, reason)
+                    bot.send_message(msg.chat.id, ret, parse_mode='HTML')
+            delete_events[event_key] = datetime.utcnow()
+
+            ids = set([GLOBAL_CHANNEL_ID])
+            channel_id = get_setting(group_config, msg.chat.id, 'log_channel_id')
+            if channel_id:
+                ids.add(channel_id)
+            for chid in ids:
+                formats = get_setting(group_config, chid, 'logformat', default=['simple'])
+                from_chatname = (
+                    '@%s' % msg.chat.username if msg.chat.username
+                    else '#%d' % msg.chat.id
+                )
+                if msg.from_user.username:
+                    from_username = '@%s [%s]' % (
+                        msg.from_user.username,
+                        msg.from_user.first_name
                     )
-                elif msg.from_user.first_name:
-                    from_user = msg.from_user.first_name
-                elif msg.from_user.username:
-                    from_user = msg.from_user.first_name
                 else:
-                    from_user = '#%d' % msg.from_user.id
-                event_key = (msg.chat.id, msg.from_user.id)
-                if get_setting(group_config, msg.chat.id, 'publog', True):
-                    # Notify about spam from same user only one time per hour
-                    if (
-                            event_key not in delete_events
-                            or delete_events[event_key] < datetime.utcnow() - timedelta(hours=1)
-                        ):
-                        ret = 'Removed msg from %s. Reason: new user + %s' % (from_user, reason)
-                        bot.send_message(msg.chat.id, ret, parse_mode='HTML')
-                delete_events[event_key] = datetime.utcnow()
-
-                ids = set([GLOBAL_CHANNEL_ID])
-                channel_id = get_setting(group_config, msg.chat.id, 'log_channel_id')
-                if channel_id:
-                    ids.add(channel_id)
-                for chid in ids:
-                    formats = get_setting(group_config, chid, 'logformat', default=['simple'])
-                    from_chatname = (
-                        '@%s' % msg.chat.username if msg.chat.username
-                        else '#%d' % msg.chat.id
-                    )
-                    if msg.from_user.username:
-                        from_username = '@%s [%s]' % (
-                            msg.from_user.username,
-                            msg.from_user.first_name
+                    from_username = msg.from_user.first_name
+                from_info = (
+                    'Chat: %s\nUser: <a href="tg://user?id=%d">%s</a>'
+                    % (from_chatname, msg.from_user.id, from_username)
+                )
+                try:
+                    if 'forward' in formats:
+                        bot.forward_message(chid, msg.chat.id, msg.message_id)
+                    if 'json' in formats:
+                        msg_dump = dump_telegram_object(msg)
+                        msg_dump['meta'] = {
+                            'reason': reason,
+                            'date': datetime.utcnow(),
+                        }
+                        dump = jsondate.dumps(msg_dump, indent=4, ensure_ascii=False)
+                        dump = html.escape(dump)
+                        content = (
+                            '%s\n<pre>%s</pre>' % (from_info, dump),
                         )
-                    else:
-                        from_username = msg.from_user.first_name
-                    from_info = (
-                        'Chat: %s\nUser: <a href="tg://user?id=%d">%s</a>'
-                        % (from_chatname, msg.from_user.id, from_username)
-                    )
-                    try:
-                        if 'forward' in formats:
-                            bot.forward_message(chid, msg.chat.id, msg.message_id)
-                        if 'json' in formats:
-                            msg_dump = dump_telegram_object(msg)
-                            msg_dump['meta'] = {
-                                'reason': reason,
-                                'date': datetime.utcnow(),
-                            }
-                            dump = jsondate.dumps(msg_dump, indent=4, ensure_ascii=False)
-                            dump = html.escape(dump)
-                            content = (
-                                '%s\n<pre>%s</pre>' % (from_info, dump),
-                            )
-                            bot.send_message(chid, content, parse_mode='HTML')
-                        if 'simple' in formats:
-                            text = html.escape(msg.text or msg.caption)
-                            content = (
-                                '%s\nReason: %s\nContent:\n<pre>%s</pre>'
-                                % (from_info, reason, text)
-                            )
-                            bot.send_message(chid, content, parse_mode='HTML')
-                    except Exception as ex:
-                        logging.error(
-                            'Failed to send notification to channel [%d]' % chid,
-                            exc_info=ex
+                        bot.send_message(chid, content, parse_mode='HTML')
+                    if 'simple' in formats:
+                        text = html.escape(msg.text or msg.caption)
+                        content = (
+                            '%s\nReason: %s\nContent:\n<pre>%s</pre>'
+                            % (from_info, reason, text)
                         )
-            finally:
-                bot.delete_message(msg.chat.id, msg.message_id)
-
+                        bot.send_message(chid, content, parse_mode='HTML')
+                except Exception as ex:
+                    logging.error(
+                        'Failed to send notification to channel [%d]' % chid,
+                        exc_info=ex
+                    )
     return bot
 
 
