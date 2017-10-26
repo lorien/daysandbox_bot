@@ -36,7 +36,7 @@ This bot does not ban anybody, it only deletes messages by the rules listed abov
 `/help` - display this help message
 `/stat` - display simple statistics about number of deleted messages
 `/daysandbox_set publog=[yes|no]` - enable/disable messages to group about deleted posts
-`/daysandbox_set safe_hours=[int]` - number in hours, how long new users are restricted to post links and forward posts, default is 24 hours (1 day). Allowed value is number between 1 and 168 (7 days).
+`/daysandbox_set safe_hours=[int]` - number in hours, how long new users are restricted to post links and forward posts, default is 24 hours (1 day). Allowed value is number between 1 and 8760 (365 days).
 `/daysandbox_get publog` - get value of `publog` setting
 `/daysandbox_get safe_hours` - get value of `safe_hours` setting
 
@@ -270,9 +270,9 @@ def create_bot(api_token, db):
                 if not val.isdigit():
                     bot.reply_to(msg, 'Invalid safe_hours value. Should be a number')
                 val_int = int(val)
-                days_7 = 24 * 7
-                if val_int < 0 or val_int > days_7:
-                    bot.reply_to(msg, 'Invalid safe_hours value. Should be a number between 1 and %d' % days_7)
+                max_hours = 24 * 365
+                if val_int < 0 or val_int > max_hours:
+                    bot.reply_to(msg, 'Invalid safe_hours value. Should be a number between 1 and %d' % max_hours)
                 set_setting(db, group_config, msg.chat.id, key, val_int)
                 bot.reply_to(msg, 'Set safe_hours to %s for group %s' % (
                     val_int,
