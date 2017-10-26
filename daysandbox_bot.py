@@ -375,6 +375,10 @@ def create_bot(api_token, db):
                 to_delete = True
                 reason = 'external link'
                 break
+            if ent.type in ('email',):
+                to_delete = True
+                reason = 'email'
+                break
             if ent.type == 'mention':
                 username = msg.text[ent.offset:ent.offset + ent.length].lstrip('@')
                 user_type = process_user_type(db, username)
