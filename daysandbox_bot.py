@@ -400,7 +400,7 @@ def create_bot(api_token, db):
                 reason = 'caption email'
                 break
             if cap_ent.type == 'mention':
-                username = msg.text[cap_ent.offset:cap_ent.offset + cap_ent.length].lstrip('@')
+                username = msg.caption[cap_ent.offset:cap_ent.offset + cap_ent.length].lstrip('@')
                 user_type = process_user_type(username)
                 if user_type in ('group', 'channel'):
                     to_delete = True
