@@ -222,9 +222,17 @@ def create_bot(api_token, db):
                     top_ystd[key] += 1
                 top_week[key] += 1
             days.insert(0, num)
+        today_count = len(top_today)
+        ystd_count = len(top_ystd)
         ret = 'Recent 7 days: %s' % ' | '.join([str(x) for x in days])
-        ret += '\n\nTop today:\n%s' % '\n'.join('  %s (%d)' % x for x in top_today.most_common())
-        ret += '\n\nTop yesterday:\n%s' % '\n'.join('  %s (%d)' % x for x in top_ystd.most_common())
+        ret += '\n\nTop today: (%s)\n%s' % (
+            today_count,
+            '\n'.join('  %s (%d)' % x for x in top_today.most_common(15))
+        )
+        ret += '\n\nTop yesterday: (%s)\n%s' % (
+            ystd_count,
+            '\n'.join('  %s (%d)' % x for x in top_ystd.most_common(15))
+        )
         ret += '\n\nTop 10 week:\n%s' % '\n'.join('  %s (%d)' % x for x in top_week.most_common(10))
         bot.reply_to(msg, ret)
 
