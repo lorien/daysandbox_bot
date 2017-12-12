@@ -182,9 +182,14 @@ def create_bot(api_token, db):
 
     @bot.message_handler(commands=['start', 'help'])
     def handle_start_help(msg):
-        if msg.chat.type != 'private':
-            return
-        bot.reply_to(msg, HELP, parse_mode='Markdown')
+        if msg.chat.type == 'private':
+            bot.reply_to(msg, HELP, parse_mode='Markdown')
+        else:
+            if msg.text.strip() in (
+                    '/start', '/start@daysandbox_bot', '/start@daysandbox_test_bot',
+                    '/help', '/help@daysandbox_bot', '/help@daysandbox_test_bot'
+                ):
+                bot.delete_message(msg.chat.id, msg.message_id)
 
     @bot.message_handler(commands=['stat'])
     def handle_stat(msg):
