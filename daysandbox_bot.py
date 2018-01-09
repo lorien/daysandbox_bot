@@ -53,11 +53,18 @@ text of message (or caption text of photo/video)
 - "forward" - simply forward message to the channel (just message, no data about chat or author).
 
 *Questions, Feedback*
+
 Support group: [@daysandbox_chat](https://t.me/daysandbox_chat)
 
 *Open Source*
 
 The source code is available at [github.com/lorien/daysandbox_bot](https://github.com/lorien/daysandbox_bot)
+
+*My Other Project*
+
+[@nosticker_bot](https://t.me/nosticker_bot) - bot to delete stickers posted to group
+[@coinsignal_robot](https://t.me/coinsignal_robot) - bot to be notified when price of specific coin reaches the level you have set, also you can use this bot just to see price of coins.
+
 """
 SUPERUSER_IDS = set([
     46284539, # @madspectator
