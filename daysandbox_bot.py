@@ -7,11 +7,11 @@ import json
 import logging
 import telebot
 from argparse import ArgumentParser
-from pymongo import MongoClient
 from datetime import datetime, timedelta
 import html
 
 from util import find_username_links, find_external_links, fetch_user_type
+from database import connect_db
 
 HELP = """*DaySandBox Bot Help*
 
@@ -165,7 +165,8 @@ def process_user_type(db, username):
         return user_type
 
 
-def create_bot(api_token, db):
+def create_bot(api_token):
+    db = connect_db()
     bot = telebot.TeleBot(api_token)
     joined_users = load_joined_users(db)
     group_config = load_group_config(db)
@@ -501,20 +502,23 @@ def create_bot(api_token, db):
     return bot
 
 
+def init_bot_with_mode(mode):
+    with open('var/config.json') as inp:
+        config = json.load(inp)
+    if mode == 'test':
+        token = config['test_api_token']
+    else:
+        token = config['api_token']
+    bot = create_bot(token)
+    return bot
+
+
 def main():
     parser = ArgumentParser()
     parser.add_argument('--mode')
     opts = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG)
-    with open('var/config.json') as inp:
-        config = json.load(inp)
-    if opts.mode == 'test':
-        token = config['test_api_token']
-    else:
-        token = config['api_token']
-    db = MongoClient()['daysandbox']
-    db.user.create_index('username', unique=True)
-    bot = create_bot(token, db)
+    bot = init_bot_with_mode(opts.mode)
     bot.polling()
 
 

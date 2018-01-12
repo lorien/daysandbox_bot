@@ -1,3 +1,5 @@
 pytelegrambotapi
 pymongo
 jsondate
+bottle
+gunicorn
