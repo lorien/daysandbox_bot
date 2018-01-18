@@ -525,6 +525,7 @@ def main():
     opts = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG)
     bot = init_bot_with_mode(opts.mode)
+    bot.remove_webhook()
     bot.polling()
 
 
