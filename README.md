@@ -23,3 +23,10 @@ To get more help submit `/help` command to the bot.
 * Telegram chat: [@daysandbox_chat](https://t.me/daysandbox_chat)
 * Owner's telegram: [@madspectator](https://t.me/madspectator)
 * Use github issues to report bugs: [github issues](https://github.com/lorien/daysandbox_bot/issues)
+
+## Donation
+
+* Ethereum: 0x00D0c93B180452a7c7B70F463aD9D24d9C6d4d61
+* Litecoin: LKJ86NwUkoboZyFHQwKPx8X984g3m3MPjC
+* Dash: XtGpsphiR2n9Shx9JFAwnuwGmWzSEvmrtU
+* UFO coin: CAdfaUR3tqfumoN7vQMVZ98CakyywgwK1L
