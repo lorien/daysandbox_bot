@@ -197,7 +197,7 @@ def create_bot(api_token):
     @bot.message_handler(commands=['start', 'help'])
     def handle_start_help(msg):
         if msg.chat.type == 'private':
-            bot.reply_to(msg, HELP, parse_mode='Markdown')
+            bot.reply_to(msg, HELP, parse_mode='Markdown', disable_web_page_preview=True)
         else:
             if msg.text.strip() in (
                     '/start', '/start@daysandbox_bot', '/start@daysandbox_test_bot',
