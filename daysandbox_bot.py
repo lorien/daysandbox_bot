@@ -9,6 +9,7 @@ import telebot
 from argparse import ArgumentParser
 from datetime import datetime, timedelta
 import html
+import time
 
 from util import find_username_links, find_external_links, fetch_user_type
 from database import connect_db
@@ -110,7 +111,8 @@ def save_event(db, event_type, msg, **kwargs):
 
 def load_joined_users(db):
     ret = {}
-    for user in db.joined_user.find():
+    fields = {'chat_id': 1, 'user_id': 1, 'date': 1, '_id': 0}
+    for user in db.joined_user.find({}, fields):
         ret[(user['chat_id'], user['user_id'])] = user['date']
     return ret
 
@@ -174,7 +176,9 @@ def process_user_type(db, username):
 def create_bot(api_token):
     db = connect_db()
     bot = telebot.TeleBot(api_token)
+    start = time.time()
     joined_users = load_joined_users(db)
+    print('load_joined_users: %.2f' % (time.time() - start));
     group_config = load_group_config(db)
     delete_events = {}
 
