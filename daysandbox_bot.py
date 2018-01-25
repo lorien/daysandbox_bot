@@ -494,7 +494,13 @@ def create_bot(api_token):
                             content = (
                                 '%s\n<pre>%s</pre>' % (from_info, dump),
                             )
-                            bot.send_message(chid, content, parse_mode='HTML')
+                            try:
+                                bot.send_message(chid, content, parse_mode='HTML')
+                            except Exception as ex:
+                                if 'message is too long' in str(ex):
+                                    logging.error('Failed to log message to channel: %s' % ex)
+                                else:
+                                    raise
                         if 'simple' in formats:
                             text = html.escape(msg.text or msg.caption)
                             content = (
@@ -508,7 +514,13 @@ def create_bot(api_token):
                             exc_info=ex
                         )
             finally:
-                bot.delete_message(msg.chat.id, msg.message_id)
+                try:
+                    bot.delete_message(msg.chat.id, msg.message_id)
+                except Exception as ex:
+                    if 'message to delete not found' in str(ex):
+                        logging.error('Failed to delete spam message: %s' % ex)
+                    else:
+                        raise
     return bot
 
 
