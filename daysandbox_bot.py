@@ -55,7 +55,7 @@ text of message (or caption text of photo/video)
 
 *Questions, Feedback*
 
-Support group: [@daysandbox_chat](https://t.me/daysandbox_chat)
+Support group: [@tgrambots](https://t.me/tgrambots)
 
 *Open Source*
 
@@ -65,6 +65,7 @@ The source code is available at [github.com/lorien/daysandbox_bot](https://githu
 
 [@nosticker_bot](https://t.me/nosticker_bot) - bot to delete stickers posted to group
 [@coinsignal_robot](https://t.me/coinsignal_robot) - bot to be notified when price of specific coin reaches the level you have set, also you can use this bot just to see price of coins.
+[@joinhider_bot](https://t.me/joinhider_bot) - bot to delete messages about user joined or left the chat
 
 *Donation*
 Ethereum: 0x00D0c93B180452a7c7B70F463aD9D24d9C6d4d61
