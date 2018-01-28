@@ -422,19 +422,22 @@ def create_bot(api_token):
             if msg.forward_from or msg.forward_from_chat:
                 reason = 'forwarded'
                 to_delete = True
-        if not to_delete:
-            usernames = find_username_links(msg.caption or '')
-            for username in usernames:
-                username = username.lstrip('@')
-                user_type = process_user_type(db, username)
-                if user_type in ('group', 'channel'):
-                    reason = 'caption @-link to group/channel'
-                    to_delete = True
-                    break
-        if not to_delete:
-            if find_external_links(msg.caption or ''):
-                reason = 'caption external link'
+        for cap_ent in (msg.caption_entities or []):
+            if cap_ent.type in ('url', 'text_link'):
                 to_delete = True
+                reason = 'caption external link'
+                break
+            if cap_ent.type in ('email',):
+                to_delete = True
+                reason = 'caption email'
+                break
+            if cap_ent.type == 'mention':
+                username = msg.caption[cap_ent.offset:cap_ent.offset + cap_ent.length].lstrip('@')
+                user_type = process_user_type(username)
+                if user_type in ('group', 'channel'):
+                    to_delete = True
+                    reason = 'caption @-link to group/channel'
+                    break
         if to_delete:
             try:
                 save_event(db, 'delete_msg', msg, reason=reason)
