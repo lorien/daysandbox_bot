@@ -10,6 +10,7 @@ from argparse import ArgumentParser
 from datetime import datetime, timedelta
 import html
 import time
+from traceback import format_exc
 
 from util import find_username_links, find_external_links, fetch_user_type
 from database import connect_db
@@ -208,7 +209,17 @@ def create_bot(api_token):
                     '/start', '/start@daysandbox_bot', '/start@daysandbox_test_bot',
                     '/help', '/help@daysandbox_bot', '/help@daysandbox_test_bot'
                 ):
-                bot.delete_message(msg.chat.id, msg.message_id)
+                try:
+                    bot.delete_message(msg.chat.id, msg.message_id)
+                except Exception as ex:
+                    if (
+                            'message to delete not found' in str(ex)
+                            or "message can\'t be deleted" in str(ex)
+                            or 'MESSAGE_ID_INVALID' in str(ex)
+                        ):
+                        logging.error('Failed to delete command message: %s' % ex)
+                    else:
+                        raise
 
     @bot.message_handler(commands=['stat'])
     def handle_stat(msg):
@@ -338,7 +349,7 @@ def create_bot(api_token):
         if not msg.chat.type in ('group', 'supergroup'):
             bot.reply_to(msg, 'This command have to be called from the group')
             return
-        if msg.forward_from_chat.type != 'channel':
+        if not msg.forward_from_chat or msg.forward_from_chat.type != 'channel':
             bot.reply_to(msg, 'Command /setlog must be forwarded from channel')
             return
         channel = msg.forward_from_chat
@@ -518,8 +529,20 @@ def create_bot(api_token):
                 try:
                     bot.delete_message(msg.chat.id, msg.message_id)
                 except Exception as ex:
-                    if 'message to delete not found' in str(ex):
-                        logging.error('Failed to delete spam message: %s' % ex)
+                    db.fail.save({
+                        'date': datetime.utcnow(),
+                        'reason': str(ex),
+                        'traceback': format_exc(),
+                        'chat_id': msg.chat.id,
+                        'msg_id': msg.message_id,
+                    })
+                    if (
+                            'message to delete not found' in str(ex)
+                            or "message can\'t be deleted" in str(ex)
+                            or 'MESSAGE_ID_INVALID' in str(ex)
+                            or 'message to forward not found' in str(ex)
+                        ):
+                        logging.error('Failed to process spam message: %s' % ex)
                     else:
                         raise
     return bot
