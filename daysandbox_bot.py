@@ -214,7 +214,8 @@ def create_bot(api_token):
                 except Exception as ex:
                     if (
                             'message to delete not found' in str(ex)
-                            or "message can\'t be deleted" in str(ex)
+                            #or "message can\'t be deleted" in str(ex)
+                            or "be deleted" in str(ex) # quick fix
                             or 'MESSAGE_ID_INVALID' in str(ex)
                         ):
                         logging.error('Failed to delete command message: %s' % ex)
@@ -494,7 +495,23 @@ def create_bot(api_token):
                     )
                     try:
                         if 'forward' in formats:
-                            bot.forward_message(chid, msg.chat.id, msg.message_id)
+                            try:
+                                bot.forward_message(chid, msg.chat.id, msg.message_id)
+                            except Exception as ex:
+                                db.fail.save({
+                                    'date': datetime.utcnow(),
+                                    'reason': str(ex),
+                                    'traceback': format_exc(),
+                                    'chat_id': msg.chat.id,
+                                    'msg_id': msg.message_id,
+                                })
+                                if (
+                                        'MESSAGE_ID_INVALID' in str(ex)
+                                        or 'message to forward not found' in str(ex)
+                                    ):
+                                    logging.error('Failed to process spam message: %s' % ex)
+                                else:
+                                    raise
                         if 'json' in formats:
                             msg_dump = dump_telegram_object(msg)
                             msg_dump['meta'] = {
@@ -538,7 +555,8 @@ def create_bot(api_token):
                     })
                     if (
                             'message to delete not found' in str(ex)
-                            or "message can\'t be deleted" in str(ex)
+                            #or "message can\'t be deleted" in str(ex)
+                            or "be deleted" in str(ex)
                             or 'MESSAGE_ID_INVALID' in str(ex)
                             or 'message to forward not found' in str(ex)
                         ):
