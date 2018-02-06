@@ -2,6 +2,8 @@
 import json
 import logging
 import uuid
+from queue import Queue
+from threading import Thread
 
 import telebot
 from bottle import Bottle, request, abort, run
@@ -14,6 +16,8 @@ app = Bottle()
 def setup_web_app():
     logging.basicConfig(level=logging.DEBUG)
     bot = init_bot_with_mode('main')
+    update_queue = Queue()
+    dispatcher = Dispatcher(bot, update_queue)
 
     secret_key = str(uuid.uuid4())
 
