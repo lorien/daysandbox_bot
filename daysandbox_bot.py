@@ -11,12 +11,12 @@ import html
 import time
 from traceback import format_exc
 
-from telegram import ParseMode
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
+from telegram import ParseMode, Bot
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, RegexHandler
 from telegram.error import TelegramError
 from telegram.ext.dispatcher import run_async
 
-from model import load_joined_users, load_group_config
+from model import load_group_config
 from util import find_username_links, find_external_links, fetch_user_type
 from database import connect_db
 
@@ -92,11 +92,25 @@ DEFAULT_SAFE_HOURS = 24
 db = connect_db()
 
 # Some shitty global code
-start = time.time()
-JOINED_USERS = load_joined_users(db)
-print('load_joined_users: %.2f' % (time.time() - start));
+JOINED_USERS = {}
 GROUP_CONFIG = load_group_config(db)
 DELETE_EVENTS = {}
+
+
+def get_join_date(chat_id, user_id):
+    key = (chat_id, user_id)
+    if key in JOINED_USERS:
+        return JOINED_USERS[key]
+    else:
+        item = db.joined_user.find_one(
+            {'chat_id': chat_id, 'user_id': user_id},
+            {'date': 1, '_id': 0}
+        )
+        if item:
+            JOINED_USERS[key] = item['date']
+            return JOINED_USERS[key]
+        else:
+            return None
 
 
 def save_event(db, event_type, msg, **kwargs):
@@ -164,10 +178,10 @@ def handle_new_chat_members(bot, update):
             {
                 'chat_id': msg.chat.id,
                 'user_id': user.id,
-                'chat_username': msg.chat.username,
-                'user_username': user.username,
             },
-            {'$set': {'date': now}},
+            {'$set': {
+                'date': now,
+            }},
             upsert=True,
         )
 
@@ -202,6 +216,8 @@ def handle_start_help(bot, update):
 @run_async
 def handle_stat(bot, update):
     msg = update.effective_message
+    bot.send_message(msg.chat.id, 'This feature is temporarely disabled')
+    return
     if msg.chat.type != 'private':
         return
     days = []
@@ -310,6 +326,7 @@ def handle_set_get(bot, update):
 @run_async
 def handle_setlogformat(bot, update):
     msg = update.effective_message
+    logging.debug('Processing /setlogformat')
     # Possible options:
     # /setlogformat [json|forward]*
     if not msg.chat.type == 'channel':
@@ -375,6 +392,8 @@ def handle_unsetlog(bot, upate):
 @run_async
 def handle_any_message(bot, update):
     msg = update.effective_message
+    if (msg.text or '').startswith('/setlogformat'):
+        logging.debug('Got /setlogforamt event in handle_any_message')
     if msg.chat.type == 'channel':
         return
     to_delete = False
@@ -382,9 +401,8 @@ def handle_any_message(bot, update):
         reason = 'debug delete'
         to_delete = True
     if not to_delete:
-        try:
-            join_date = JOINED_USERS[(msg.chat.id, msg.from_user.id)]
-        except KeyError:
+        join_date = get_join_date(msg.chat.id, msg.from_user.id)
+        if join_date is None:
             return
         safe_hours = get_setting(GROUP_CONFIG, msg.chat.id, 'safe_hours', DEFAULT_SAFE_HOURS)
         if datetime.utcnow() - timedelta(hours=safe_hours) > join_date:
@@ -444,7 +462,7 @@ def handle_any_message(bot, update):
                         or DELETE_EVENTS[event_key] < datetime.utcnow() - timedelta(hours=1)
                     ):
                     ret = 'Removed msg from %s. Reason: new user + %s' % (from_user, reason)
-                    bot.send_message(msg.chat.id, ret, parse_mode='HTML')
+                    bot.send_message(msg.chat.id, ret, parse_mode=ParseMode.HTML)
             DELETE_EVENTS[event_key] = datetime.utcnow()
 
             ids = set([GLOBAL_CHANNEL_ID])
@@ -454,7 +472,8 @@ def handle_any_message(bot, update):
             for chid in ids:
                 formats = get_setting(GROUP_CONFIG, chid, 'logformat', default=['simple'])
                 from_chatname = (
-                    '@%s' % msg.chat.username if msg.chat.username
+                    '<a href="https://t.me/%s">@%s</a>' % (msg.chat.username, msg.chat.username)
+                    if msg.chat.username
                     else '#%d' % msg.chat.id
                 )
                 if msg.from_user.username:
@@ -462,11 +481,17 @@ def handle_any_message(bot, update):
                         msg.from_user.username,
                         msg.from_user.first_name
                     )
+                elif msg.from_user.first_name:
+                    from_user = msg.from_user.first_name
+                elif msg.from_user.username:
+                    from_user = msg.from_user.first_name
                 else:
                     from_username = msg.from_user.first_name
                 from_info = (
                     'Chat: %s\nUser: <a href="tg://user?id=%d">%s</a>'
+                    #'Chat: %s\nUser: %s'#<a href="tg://user?id=%d">%s</a>'
                     % (from_chatname, msg.from_user.id, from_username)
+                    #% (from_chatname, from_username)
                 )
                 try:
                     if 'forward' in formats:
@@ -496,14 +521,18 @@ def handle_any_message(bot, update):
                         dump = jsondate.dumps(msg_dump, indent=4, ensure_ascii=False)
                         dump = html.escape(dump)
                         content = (
-                            '%s\n<pre>%s</pre>' % (from_info, dump),
+                            '%s\n<pre>%s</pre>' % (
+                                from_info,
+                                dump
+                            )
                         )
                         try:
-                            bot.send_message(chid, content, parse_mode='HTML')
+                            bot.send_message(chid, content, parse_mode=ParseMode.HTML)
                         except Exception as ex:
                             if 'message is too long' in str(ex):
                                 logging.error('Failed to log message to channel: %s' % ex)
                             else:
+                                logging.debug('Failed sending HTML:%s' % content)
                                 raise
                     if 'simple' in formats:
                         text = html.escape(msg.text or msg.caption)
@@ -511,7 +540,7 @@ def handle_any_message(bot, update):
                             '%s\nReason: %s\nContent:\n<pre>%s</pre>'
                             % (from_info, reason, text)
                         )
-                        bot.send_message(chid, content, parse_mode='HTML')
+                        bot.send_message(chid, content, parse_mode=ParseMode.HTML)
                 except Exception as ex:
                     logging.error(
                         'Failed to send notification to channel [%d]' % chid,
@@ -540,14 +569,24 @@ def handle_any_message(bot, update):
                     raise
 
 
-def init_bot_with_mode(mode):
+def get_token(mode):
+    assert mode in ('test', 'production')
     with open('var/config.json') as inp:
         config = json.load(inp)
     if mode == 'test':
-        token = config['test_api_token']
+        return config['test_api_token']
     else:
-        token = config['api_token']
-    return Updater(token=token, workers=16)
+        return config['api_token']
+
+
+def init_updater_with_mode(mode):
+    assert mode in ('test', 'production')
+    return Updater(token=get_token(mode), workers=16)
+
+
+def init_bot_with_mode(mode):
+    assert mode in ('test', 'production')
+    return Bot(token=get_token(mode))
 
 
 def register_handlers(dispatcher):
@@ -555,11 +594,15 @@ def register_handlers(dispatcher):
     dispatcher.add_handler(CommandHandler(['start', 'help'], handle_start_help))
     dispatcher.add_handler(CommandHandler('stat', handle_stat))
     dispatcher.add_handler(CommandHandler(['daysandbox_set', 'daysandbox_get'], handle_set_get))
-    dispatcher.add_handler(CommandHandler('setlogformat', handle_setlogformat))
+    dispatcher.add_handler(RegexHandler(r'^/setlogformat ', handle_setlogformat, channel_post_updates=True))
     dispatcher.add_handler(CommandHandler('setlog', handle_setlog))
     dispatcher.add_handler(CommandHandler('unsetlog', handle_unsetlog))
     dispatcher.add_handler(MessageHandler(
-        (Filters.text | Filters.photo | Filters.video | Filters.audio | Filters.sticker | Filters.document),
+        #(
+        #    Filters.text | Filters.photo | Filters.video | Filters.audio
+        #    | Filters.sticker | Filters.document | Filters.command
+        #),
+        Filters.all,
         handle_any_message,
         edited_updates=True
     ))
@@ -567,13 +610,13 @@ def register_handlers(dispatcher):
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('--mode')
+    parser.add_argument('--mode', default='production')
     opts = parser.parse_args()
     logging.basicConfig(level=logging.DEBUG)
-    updater = init_bot_with_mode(opts.mode)
+    updater = init_updater_with_mode(opts.mode)
     dispatcher = updater.dispatcher
     register_handlers(dispatcher)
-    # TODO: remove web hook if any
+    updater.bot.delete_webhook()
     updater.start_polling()
 
 
