@@ -482,9 +482,9 @@ def handle_any_message(bot, update):
                         msg.from_user.first_name
                     )
                 elif msg.from_user.first_name:
-                    from_user = msg.from_user.first_name
+                    from_username = msg.from_user.first_name
                 elif msg.from_user.username:
-                    from_user = msg.from_user.first_name
+                    from_username = msg.from_user.first_name
                 else:
                     from_username = msg.from_user.first_name
                 from_info = (
