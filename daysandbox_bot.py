@@ -216,55 +216,30 @@ def handle_start_help(bot, update):
 @run_async
 def handle_stat(bot, update):
     msg = update.effective_message
-    bot.send_message(msg.chat.id, 'This feature is temporarely disabled')
-    return
     if msg.chat.type != 'private':
         return
-    days = []
-    top_today = Counter()
-    top_ystd = Counter()
-    top_week = Counter()
+    cnt = {
+        'delete_msg': [],
+        'chat': [],
+    }
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     for x in range(7):
         day = today - timedelta(days=x)
-        query = {'$and': [
-            {'type': 'delete_msg'},
-            {'date': {'$gte': day}},
-            {'date': {'$lt': day + timedelta(days=1)}},
-        ]}
-        num = 0
-        for event in db.event.find(query):
-            num += 1
-            if isinstance(event.get('chat'), dict):
-                key  = (
-                    '@%s' % event['chat']['username'] if event['chat'].get('username')
-                    else '#%d' % event['chat']['id']
-                )
-            else:
-                # OLD event format
-                key  = (
-                    '@%s' % event['chat_username'] if event['chat_username']
-                    else '#%d' % event['chat_id']
-                )
-            if day == today:
-                top_today[key] += 1
-            if day == (today - timedelta(days=1)):
-                top_ystd[key] += 1
-            top_week[key] += 1
-        days.insert(0, num)
-    today_count = len(top_today)
-    ystd_count = len(top_ystd)
-    ret = 'Recent 7 days: %s' % ' | '.join([str(x) for x in days])
-    ret += '\n\nTop today: (%s)\n%s' % (
-        today_count,
-        '\n'.join('  %s (%d)' % x for x in top_today.most_common(15))
-    )
-    ret += '\n\nTop yesterday: (%s)\n%s' % (
-        ystd_count,
-        '\n'.join('  %s (%d)' % x for x in top_ystd.most_common(15))
-    )
-    ret += '\n\nTop 10 week:\n%s' % '\n'.join('  %s (%d)' % x for x in top_week.most_common(10))
-    bot.send_message(msg.chat.id, ret)
+        stat = db.day_stat.find_one({'date': day})
+        if stat:
+            cnt['delete_msg'].insert(0, stat['delete_msg'])
+            cnt['chat'].insert(0, stat['chat'])
+        else:
+            cnt['delete_msg'].insert(0, 'NA')
+            cnt['chat'].insert(0, 'NA')
+
+    ret = '*Recent 7 days stat*\n'
+    ret += '\n'
+    ret += 'Deleted messages:\n'
+    ret += ('    %s' % '|'.join(map(str, cnt['delete_msg']))) + '\n'
+    ret += 'Affected chats:\n'
+    ret += ('    %s' % '|'.join(map(str, cnt['chat']))) + '\n'
+    bot.send_message(msg.chat.id, ret, parse_mode=ParseMode.MARKDOWN)
 
 @run_async
 def handle_set_get(bot, update):
