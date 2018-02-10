@@ -17,7 +17,7 @@ def setup_web_app(app, mode='production'):
     update_queue = Queue()
     dispatcher = Dispatcher(bot, update_queue)
     #dispatcher = Dispatcher(bot, None, workers=0)
-    register_handlers(dispatcher)
+    register_handlers(dispatcher, mode)
 
     thread = Thread(target=dispatcher.start, name='dispatcher')
     thread.start()

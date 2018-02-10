@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 import html
 import time
 from traceback import format_exc
+from itertools import chain
+from functools import partial
 
 from telegram import ParseMode, Bot
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, RegexHandler
@@ -86,7 +88,10 @@ SUPERUSER_IDS = set([
 # List of keys allowed to use in set_setting/get_setting
 GROUP_SETTING_KEYS = ('publog', 'log_channel_id', 'logformat', 'safe_hours')
 # Channel of global channel to translate ALL spam
-GLOBAL_CHANNEL_ID = -1001148916224 
+GLOBAL_LOG_CHANNEL_ID = {
+    'production': -1001148916224,
+    'test': -1001318592769,
+}
 # Default time to reject link and forwarded posts from new user
 DEFAULT_SAFE_HOURS = 24
 db = connect_db()
@@ -440,7 +445,7 @@ def handle_any_message(bot, update):
                     bot.send_message(msg.chat.id, ret, parse_mode=ParseMode.HTML)
             DELETE_EVENTS[event_key] = datetime.utcnow()
 
-            ids = set([GLOBAL_CHANNEL_ID])
+            ids = set([GLOBAL_LOG_CHANNEL_ID[mode]])
             channel_id = get_setting(GROUP_CONFIG, msg.chat.id, 'log_channel_id')
             if channel_id:
                 ids.add(channel_id)
@@ -564,22 +569,26 @@ def init_bot_with_mode(mode):
     return Bot(token=get_token(mode))
 
 
-def register_handlers(dispatcher):
-    dispatcher.add_handler(MessageHandler(Filters.status_update.new_chat_members, handle_new_chat_members))
-    dispatcher.add_handler(CommandHandler(['start', 'help'], handle_start_help))
+def register_handlers(dispatcher, mode):
+    assert mode in ('production', 'test')
+
+    dispatcher.add_handler(MessageHandler(
+        Filters.status_update.new_chat_members, handle_new_chat_members
+    ))
+    dispatcher.add_handler(CommandHandler(
+        ['start', 'help'], handle_start_help
+    ))
     dispatcher.add_handler(CommandHandler('stat', handle_stat))
-    dispatcher.add_handler(CommandHandler(['daysandbox_set', 'daysandbox_get'], handle_set_get))
-    dispatcher.add_handler(RegexHandler(r'^/setlogformat ', handle_setlogformat, channel_post_updates=True))
+    dispatcher.add_handler(CommandHandler(
+        ['daysandbox_set', 'daysandbox_get'], handle_set_get
+    ))
+    dispatcher.add_handler(RegexHandler(
+        r'^/setlogformat ', handle_setlogformat, channel_post_updates=True
+    ))
     dispatcher.add_handler(CommandHandler('setlog', handle_setlog))
     dispatcher.add_handler(CommandHandler('unsetlog', handle_unsetlog))
     dispatcher.add_handler(MessageHandler(
-        #(
-        #    Filters.text | Filters.photo | Filters.video | Filters.audio
-        #    | Filters.sticker | Filters.document | Filters.command
-        #),
-        Filters.all,
-        handle_any_message,
-        edited_updates=True
+        Filters.all, partial(handle_any_message, mode), edited_updates=True
     ))
 
 
@@ -590,7 +599,7 @@ def main():
     logging.basicConfig(level=logging.DEBUG)
     updater = init_updater_with_mode(opts.mode)
     dispatcher = updater.dispatcher
-    register_handlers(dispatcher)
+    register_handlers(dispatcher, opts.mode)
     updater.bot.delete_webhook()
     updater.start_polling()
 
