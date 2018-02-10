@@ -387,7 +387,7 @@ def handle_any_message(mode, bot, update):
         safe_hours = get_setting(GROUP_CONFIG, msg.chat.id, 'safe_hours', DEFAULT_SAFE_HOURS)
         if datetime.utcnow() - timedelta(hours=safe_hours) > join_date:
             return
-    for ent in (msg.entities or []):
+    for ent in chain(msg.entities or [], msg.caption_entities or []):
         if ent.type in ('url', 'text_link'):
             to_delete = True
             reason = 'external link'
@@ -406,19 +406,6 @@ def handle_any_message(mode, bot, update):
     if not to_delete:
         if msg.forward_from or msg.forward_from_chat:
             reason = 'forwarded'
-            to_delete = True
-    if not to_delete:
-        usernames = find_username_links(msg.caption or '')
-        for username in usernames:
-            username = username.lstrip('@')
-            user_type = process_user_type(db, username)
-            if user_type in ('group', 'channel'):
-                reason = 'caption @-link to group/channel'
-                to_delete = True
-                break
-    if not to_delete:
-        if find_external_links(msg.caption or ''):
-            reason = 'caption external link'
             to_delete = True
     if to_delete:
         try:
