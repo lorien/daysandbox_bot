@@ -369,6 +369,55 @@ def handle_unsetlog(bot, upate):
     bot.send_message(msg.chat.id, 'Unset log channel for group %s' % tgid)
 
 
+def get_delete_reason(msg):
+    if (
+            msg.from_user.username == 'madspectator'
+            and (msg.text == 'del' or msg.caption == 'del')
+        ):
+        return True, 'debug delete'
+    join_date = get_join_date(msg.chat.id, msg.from_user.id)
+    if join_date is None:
+        return False, None
+    safe_hours = get_setting(
+        GROUP_CONFIG, msg.chat.id, 'safe_hours', DEFAULT_SAFE_HOURS
+    )
+    if datetime.utcnow() - timedelta(hours=safe_hours) > join_date:
+        return False, None
+    locations = [
+        ('text', msg.entities or []),
+        ('caption', msg.caption_entities or []),
+    ]
+    for scope, entities in locations:
+        for ent in entities:
+            if ent.type in ('url', 'text_link'):
+                return True, 'external link'
+            if ent.type in ('email',):
+                return True, 'email'
+            if ent.type == 'mention':
+                text = msg.text if scope == 'text' else msg.caption
+                username = text[ent.offset:ent.offset + ent.length].lstrip('@')
+                user_type = process_user_type(db, username)
+                if user_type in ('group', 'channel'):
+                    return True, '@-link to group/channel'
+    if msg.forward_from or msg.forward_from_chat:
+        return True, 'forwarded'
+    return False, None
+
+
+def format_user_display_name(user):
+    if user.first_name and user.last_name:
+        return '%s %s' % (
+            user.first_name,
+            user.last_name,
+        )
+    elif user.first_name:
+        return user.first_name
+    elif user.username:
+        return user.first_name
+    else:
+        return '#%d' % user.id
+
+
 @run_async
 def handle_any_message(mode, bot, update):
     msg = update.effective_message
@@ -376,94 +425,54 @@ def handle_any_message(mode, bot, update):
         logging.debug('Got /setlogforamt event in handle_any_message')
     if msg.chat.type in ('channel', 'private'):
         return
-    to_delete = False
-    if msg.from_user.username == 'madspectator' and (msg.text == 'del' or msg.caption == 'del'):
-        reason = 'debug delete'
-        to_delete = True
-    if not to_delete:
-        join_date = get_join_date(msg.chat.id, msg.from_user.id)
-        if join_date is None:
-            return
-        safe_hours = get_setting(GROUP_CONFIG, msg.chat.id, 'safe_hours', DEFAULT_SAFE_HOURS)
-        if datetime.utcnow() - timedelta(hours=safe_hours) > join_date:
-            return
-    for ent in chain(msg.entities or [], msg.caption_entities or []):
-        if ent.type in ('url', 'text_link'):
-            to_delete = True
-            reason = 'external link'
-            break
-        if ent.type in ('email',):
-            to_delete = True
-            reason = 'email'
-            break
-        if ent.type == 'mention':
-            username = msg.text[ent.offset:ent.offset + ent.length].lstrip('@')
-            user_type = process_user_type(db, username)
-            if user_type in ('group', 'channel'):
-                to_delete = True
-                reason = '@-link to group/channel'
-                break
-    if not to_delete:
-        if msg.forward_from or msg.forward_from_chat:
-            reason = 'forwarded'
-            to_delete = True
+
+    to_delete, reason = get_delete_reason(msg)
     if to_delete:
         try:
             save_event(db, 'delete_msg', msg, reason=reason)
-            if msg.from_user.first_name and msg.from_user.last_name:
-                from_user = '%s %s' % (
-                    msg.from_user.first_name,
-                    msg.from_user.last_name,
-                )
-            elif msg.from_user.first_name:
-                from_user = msg.from_user.first_name
-            elif msg.from_user.username:
-                from_user = msg.from_user.first_name
-            else:
-                from_user = '#%d' % msg.from_user.id
+            user_display_name = format_user_display_name(msg.from_user)
             event_key = (msg.chat.id, msg.from_user.id)
             if get_setting(GROUP_CONFIG, msg.chat.id, 'publog', True):
                 # Notify about spam from same user only one time per hour
                 if (
                         event_key not in DELETE_EVENTS
-                        or DELETE_EVENTS[event_key] < datetime.utcnow() - timedelta(hours=1)
+                        or DELETE_EVENTS[event_key] <
+                            (datetime.utcnow() - timedelta(hours=1))
                     ):
-                    ret = 'Removed msg from %s. Reason: new user + %s' % (from_user, reason)
-                    bot.send_message(msg.chat.id, ret, parse_mode=ParseMode.HTML)
+                    ret = 'Removed msg from %s. Reason: new user + %s' % (
+                        user_display_name, reason
+                    )
+                    bot.send_message(
+                        msg.chat.id, ret, parse_mode=ParseMode.HTML
+                    )
             DELETE_EVENTS[event_key] = datetime.utcnow()
 
             ids = set([GLOBAL_LOG_CHANNEL_ID[mode]])
-            channel_id = get_setting(GROUP_CONFIG, msg.chat.id, 'log_channel_id')
+            channel_id = get_setting(
+                GROUP_CONFIG, msg.chat.id, 'log_channel_id'
+            )
             if channel_id:
                 ids.add(channel_id)
             for chid in ids:
-                formats = get_setting(GROUP_CONFIG, chid, 'logformat', default=['simple'])
-                from_chatname = (
-                    '<a href="https://t.me/%s">@%s</a>' % (msg.chat.username, msg.chat.username)
-                    if msg.chat.username
-                    else '#%d' % msg.chat.id
+                formats = get_setting(
+                    GROUP_CONFIG, chid, 'logformat', default=['simple']
                 )
-                if msg.from_user.username:
-                    from_username = '@%s [%s]' % (
-                        msg.from_user.username,
-                        msg.from_user.first_name
+                if msg.chat.username:
+                    from_chatname = '<a href="https://t.me/%s">@%s</a>' % (
+                        msg.chat.username, msg.chat.username
                     )
-                elif msg.from_user.first_name:
-                    from_username = msg.from_user.first_name
-                elif msg.from_user.username:
-                    from_username = msg.from_user.first_name
                 else:
-                    from_username = msg.from_user.first_name
+                    from_chatname = '#%d' % msg.chat.id
                 from_info = (
                     'Chat: %s\nUser: <a href="tg://user?id=%d">%s</a>'
-                    #'Chat: %s\nUser: %s'#<a href="tg://user?id=%d">%s</a>'
-                    % (from_chatname, msg.from_user.id, from_username)
-                    #% (from_chatname, from_username)
+                    % (from_chatname, msg.from_user.id, user_display_name)
                 )
                 try:
                     if 'forward' in formats:
                         try:
-                            bot.forward_message(chid, msg.chat.id, msg.message_id)
+                            bot.forward_message(
+                                chid, msg.chat.id, msg.message_id
+                            )
                         except Exception as ex:
                             db.fail.save({
                                 'date': datetime.utcnow(),
@@ -473,10 +482,12 @@ def handle_any_message(mode, bot, update):
                                 'msg_id': msg.message_id,
                             })
                             if (
-                                    'MESSAGE_ID_INVALID' in str(ex)
-                                    or 'message to forward not found' in str(ex)
+                                    'MESSAGE_ID_INVALID' in str(ex) or
+                                    'message to forward not found' in str(ex)
                                 ):
-                                logging.error('Failed to process spam message: %s' % ex)
+                                logging.error(
+                                    'Failed to process spam message: %s' % ex
+                                )
                             else:
                                 raise
                     if 'json' in formats:
