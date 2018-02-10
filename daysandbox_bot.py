@@ -370,11 +370,11 @@ def handle_unsetlog(bot, upate):
 
 
 @run_async
-def handle_any_message(bot, update):
+def handle_any_message(mode, bot, update):
     msg = update.effective_message
     if (msg.text or '').startswith('/setlogformat'):
         logging.debug('Got /setlogforamt event in handle_any_message')
-    if msg.chat.type == 'channel':
+    if msg.chat.type in ('channel', 'private'):
         return
     to_delete = False
     if msg.from_user.username == 'madspectator' and (msg.text == 'del' or msg.caption == 'del'):
