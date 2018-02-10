@@ -306,7 +306,6 @@ def handle_set_get(bot, update):
 @run_async
 def handle_setlogformat(bot, update):
     msg = update.effective_message
-    logging.debug('Processing /setlogformat')
     # Possible options:
     # /setlogformat [json|forward]*
     if not msg.chat.type == 'channel':
@@ -418,11 +417,68 @@ def format_user_display_name(user):
         return '#%d' % user.id
 
 
+def log_event_to_channel(bot, msg, reason, chid, formats):
+    if msg.chat.username:
+        from_chatname = '<a href="https://t.me/%s">@%s</a>' % (
+            msg.chat.username, msg.chat.username
+        )
+    else:
+        from_chatname = '#%d' % msg.chat.id
+    user_display_name = format_user_display_name(msg.from_user)
+    from_info = (
+        'Chat: %s\nUser: <a href="tg://user?id=%d">%s</a>'
+        % (from_chatname, msg.from_user.id, user_display_name)
+    )
+    if 'forward' in formats:
+        try:
+            bot.forward_message(
+                chid, msg.chat.id, msg.message_id
+            )
+        except Exception as ex:
+            db.fail.save({
+                'date': datetime.utcnow(),
+                'reason': str(ex),
+                'traceback': format_exc(),
+                'chat_id': msg.chat.id,
+                'msg_id': msg.message_id,
+            })
+            if (
+                    'MESSAGE_ID_INVALID' in str(ex) or
+                    'message to forward not found' in str(ex)
+                ):
+                logging.error(
+                    'Failed to forward spam message: %s' % ex
+                )
+            else:
+                raise
+    if 'json' in formats:
+        msg_dump = msg.to_dict()
+        msg_dump['meta'] = {
+            'reason': reason,
+            'date': datetime.utcnow(),
+        }
+        dump = jsondate.dumps(msg_dump, indent=4, ensure_ascii=False)
+        dump = html.escape(dump)
+        content = '%s\n<pre>%s</pre>' % (from_info, dump)
+        try:
+            bot.send_message(chid, content, parse_mode=ParseMode.HTML)
+        except Exception as ex:
+            if 'message is too long' in str(ex):
+                logging.error('Failed to log message to channel: %s' % ex)
+            else:
+                raise
+    if 'simple' in formats:
+        text = html.escape(msg.text or msg.caption)
+        content = (
+            '%s\nReason: %s\nContent:\n<pre>%s</pre>'
+            % (from_info, reason, text)
+        )
+        bot.send_message(chid, content, parse_mode=ParseMode.HTML)
+
+
 @run_async
 def handle_any_message(mode, bot, update):
     msg = update.effective_message
-    if (msg.text or '').startswith('/setlogformat'):
-        logging.debug('Got /setlogforamt event in handle_any_message')
     if msg.chat.type in ('channel', 'private'):
         return
 
@@ -457,72 +513,11 @@ def handle_any_message(mode, bot, update):
                 formats = get_setting(
                     GROUP_CONFIG, chid, 'logformat', default=['simple']
                 )
-                if msg.chat.username:
-                    from_chatname = '<a href="https://t.me/%s">@%s</a>' % (
-                        msg.chat.username, msg.chat.username
-                    )
-                else:
-                    from_chatname = '#%d' % msg.chat.id
-                from_info = (
-                    'Chat: %s\nUser: <a href="tg://user?id=%d">%s</a>'
-                    % (from_chatname, msg.from_user.id, user_display_name)
-                )
                 try:
-                    if 'forward' in formats:
-                        try:
-                            bot.forward_message(
-                                chid, msg.chat.id, msg.message_id
-                            )
-                        except Exception as ex:
-                            db.fail.save({
-                                'date': datetime.utcnow(),
-                                'reason': str(ex),
-                                'traceback': format_exc(),
-                                'chat_id': msg.chat.id,
-                                'msg_id': msg.message_id,
-                            })
-                            if (
-                                    'MESSAGE_ID_INVALID' in str(ex) or
-                                    'message to forward not found' in str(ex)
-                                ):
-                                logging.error(
-                                    'Failed to process spam message: %s' % ex
-                                )
-                            else:
-                                raise
-                    if 'json' in formats:
-                        msg_dump = msg.to_dict()
-                        msg_dump['meta'] = {
-                            'reason': reason,
-                            'date': datetime.utcnow(),
-                        }
-                        dump = jsondate.dumps(msg_dump, indent=4, ensure_ascii=False)
-                        dump = html.escape(dump)
-                        content = (
-                            '%s\n<pre>%s</pre>' % (
-                                from_info,
-                                dump
-                            )
-                        )
-                        try:
-                            bot.send_message(chid, content, parse_mode=ParseMode.HTML)
-                        except Exception as ex:
-                            if 'message is too long' in str(ex):
-                                logging.error('Failed to log message to channel: %s' % ex)
-                            else:
-                                logging.debug('Failed sending HTML:%s' % content)
-                                raise
-                    if 'simple' in formats:
-                        text = html.escape(msg.text or msg.caption)
-                        content = (
-                            '%s\nReason: %s\nContent:\n<pre>%s</pre>'
-                            % (from_info, reason, text)
-                        )
-                        bot.send_message(chid, content, parse_mode=ParseMode.HTML)
+                    log_event_to_channel(bot, msg, reason, chid, formats)
                 except Exception as ex:
-                    logging.error(
-                        'Failed to send notification to channel [%d]' % chid,
-                        exc_info=ex
+                    logging.exception(
+                        'Failed to send notification to channel [%d]' % chid
                     )
         finally:
             try:
