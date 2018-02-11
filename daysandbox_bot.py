@@ -118,7 +118,7 @@ def get_join_date(chat_id, user_id):
             return None
 
 
-def save_event(db, event_type, msg, **kwargs):
+def save_message_event(db, event_type, msg, **kwargs):
     event = msg.to_dict()
     event.update({
         'date': datetime.utcnow(),
@@ -193,6 +193,7 @@ def handle_new_chat_members(bot, update):
 @run_async
 def handle_start_help(bot, update):
     msg = update.effective_message
+    save_message_event(db, 'start_help', msg)
     if msg.chat.type == 'private':
         bot.send_message(
             msg.chat.id,
@@ -485,7 +486,7 @@ def handle_any_message(mode, bot, update):
     to_delete, reason = get_delete_reason(msg)
     if to_delete:
         try:
-            save_event(db, 'delete_msg', msg, reason=reason)
+            save_message_event(db, 'delete_msg', msg, reason=reason)
             user_display_name = format_user_display_name(msg.from_user)
             event_key = (msg.chat.id, msg.from_user.id)
             if get_setting(GROUP_CONFIG, msg.chat.id, 'publog', True):
