@@ -15,7 +15,7 @@ def setup_web_app(app, mode='production'):
     logging.basicConfig(level=logging.DEBUG)
     bot = init_bot_with_mode(mode)
     update_queue = Queue()
-    dispatcher = Dispatcher(bot, update_queue)
+    dispatcher = Dispatcher(bot, update_queue, workers=16)
     #dispatcher = Dispatcher(bot, None, workers=0)
     register_handlers(dispatcher, mode)
 
