@@ -26,11 +26,9 @@ def setup_web_app(app, mode='production'):
 
     @app.route('/%s/' % secret_key, method='POST')
     def page():
-        logging.debug('processing update!!!')
         if request.headers.get('content-type') == 'application/json':
             json_string = request.body.read().decode('utf-8')
             update = Update.de_json(json.loads(json_string), bot)
-            logging.debug('UPDATE: %s' % update)
             dispatcher.process_update(update)
             return ''
         else:
