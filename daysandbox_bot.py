@@ -499,9 +499,7 @@ def handle_any_message(mode, bot, update):
                     ret = 'Removed msg from %s. Reason: new user + %s' % (
                         user_display_name, reason
                     )
-                    bot.send_message(
-                        msg.chat.id, ret, parse_mode=ParseMode.HTML
-                    )
+                    bot.send_message(msg.chat.id, ret)
             DELETE_EVENTS[event_key] = datetime.utcnow()
 
             ids = set([GLOBAL_LOG_CHANNEL_ID[mode]])
