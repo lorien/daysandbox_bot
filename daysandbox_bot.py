@@ -496,10 +496,12 @@ def handle_any_message(mode, bot, update):
                         or DELETE_EVENTS[event_key] <
                             (datetime.utcnow() - timedelta(hours=1))
                     ):
-                    ret = 'Removed msg from %s. Reason: new user + %s' % (
-                        user_display_name, reason
+                    ret = 'Removed msg from <i>%s</i>. Reason: new user + %s' % (
+                        html.escape(user_display_name), reason
                     )
-                    bot.send_message(msg.chat.id, ret)
+                    bot.send_message(
+                        msg.chat.id, ret, parse_mode=ParseMode.HTML
+                    )
             DELETE_EVENTS[event_key] = datetime.utcnow()
 
             ids = set([GLOBAL_LOG_CHANNEL_ID[mode]])
