@@ -587,7 +587,7 @@ def get_token(mode):
 
 def init_updater_with_mode(mode):
     assert mode in ('test', 'production')
-    return Updater(token=get_token(mode), workers=16)
+    return Updater(token=get_token(mode), workers=32)
 
 
 def init_bot_with_mode(mode):
