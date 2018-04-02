@@ -129,6 +129,21 @@ def save_message_event(db, event_type, msg, **kwargs):
     db.event.save(event)
 
 
+def delete_message_safe(bot, msg):
+    try:
+        bot.delete_message(msg.chat.id, msg.message_id)
+    except Exception as ex:
+        if (
+                'message to delete not found' in str(ex)
+                #or "message can\'t be deleted" in str(ex)
+                or "be deleted" in str(ex) # quick fix
+                or 'MESSAGE_ID_INVALID' in str(ex)
+            ):
+            pass
+        else:
+            raise
+
+
 def set_setting(db, group_config, group_id, key, val):
     assert key in GROUP_SETTING_KEYS
     db.config.find_one_and_update(
@@ -254,6 +269,14 @@ def handle_set_get(bot, update):
     if not msg.chat.type in ('group', 'supergroup'):
         bot.send_message(msg.chat.id, 'This command have to be called from the group')
         return
+
+    admins = bot.get_chat_administrators(msg.chat.id)
+    admin_ids = set([x.user.id for x in admins]) | set(SUPERUSER_IDS)
+    if msg.from_user.id not in admin_ids:
+        delete_message_safe(bot, msg)
+        #bot.send_message(msg.chat.id, 'Access denied')
+        return
+
     re_cmd_set = re.compile(r'^/daysandbox_set (publog|safe_hours)=(.+)$')
     re_cmd_get = re.compile(r'^/daysandbox_get (publog|safe_hours)()$')
     if msg.text.startswith('/daysandbox_set'):
@@ -267,12 +290,6 @@ def handle_set_get(bot, update):
         return
 
     key, val = match.groups()
-
-    admins = bot.get_chat_administrators(msg.chat.id)
-    admin_ids = set([x.user.id for x in admins]) | set(SUPERUSER_IDS)
-    if msg.from_user.id not in admin_ids:
-        bot.send_message(msg.chat.id, 'Access denied')
-        return
 
     if action == 'GET':
         bot.send_message(msg.chat.id, str(get_setting(GROUP_CONFIG, msg.chat.id, key)))
@@ -310,13 +327,15 @@ def handle_setlogformat(bot, update):
     msg = update.effective_message
     # Possible options:
     # /setlogformat [json|forward]*
-    if not msg.chat.type == 'channel':
-        bot.send_message(msg.chat.id, 'This command have to be called from the channel')
+
+    if msg.chat.type != 'channel':
+        admin_ids = [x.user.id for x in bot.get_chat_administrators(msg.chat.id)]
+        if msg.from_user.id not in admin_ids:
+            # Silently ignore /setlogformat command from non-admin in non-channel
+            delete_message_safe(bot, msg)
+        else:
+            bot.send_message(msg.chat.id, 'This command have to be called from the channel')
         return
-    #channel_admin_ids = [x.user.id for x in bot.get_chat_administrators(msg.chat.id)]
-    #if msg.from_user.id not in channel_admin_ids:
-    #    bot.send_message(msg.chat.id, 'Access denied')
-    #    return
     valid_formats = ('json', 'forward', 'simple')
     formats = msg.text.split(' ')[-1].split(',')
     if any(x not in valid_formats for x in formats):
@@ -329,23 +348,26 @@ def handle_setlogformat(bot, update):
 @run_async
 def handle_setlog(bot, update):
     msg = update.effective_message
-    if not msg.chat.type in ('group', 'supergroup'):
+    admin_ids = [x.user.id for x in bot.get_chat_administrators(msg.chat.id)]
+    if msg.chat.type not in ('group', 'supergroup'):
         bot.send_message(msg.chat.id, 'This command have to be called from the group')
         return
     if not msg.forward_from_chat or msg.forward_from_chat.type != 'channel':
-        bot.send_message(msg.chat.id, 'Command /setlog must be forwarded from channel')
+        if msg.from_user.id not in admin_ids:
+            # Silently ignore /setlog command from non-admin
+            delete_message_safe(bot, msg)
+            pass
+        else:
+            bot.send_message(msg.chat.id, 'Command /setlog must be forwarded from channel')
         return
     channel = msg.forward_from_chat
-
-    channel_admin_ids = [x.user.id for x in bot.get_chat_administrators(channel.id)]
-    if bot.get_me().id not in channel_admin_ids:
-        bot.send_message(msg.chat.id, 'I need to be an admin in log channel')
+    if bot.get_me().id not in admin_ids:
+        bot.send_message(msg.chat.id, 'I need to be an admin in the chat')
         return
 
-    admins = bot.get_chat_administrators(msg.chat.id)
-    admin_ids = set([x.user.id for x in admins]) | set(SUPERUSER_IDS)
     if msg.from_user.id not in admin_ids:
-        bot.send_message(msg.chat.id, 'Access denied')
+        delete_message_safe(bot, msg)
+        #bot.send_message(msg.chat.id, 'Access denied')
         return
 
     set_setting(db, GROUP_CONFIG, msg.chat.id, 'log_channel_id', channel.id)
@@ -355,14 +377,23 @@ def handle_setlog(bot, update):
 @run_async
 def handle_unsetlog(bot, upate):
     msg = update.effective_message
+    admin_ids = [x.user.id for x in bot.get_chat_administrators(msg.chat.id)]
     if not msg.chat.type in ('group', 'supergroup'):
-        bot.send_message(msg.chat.id, 'This command have to be called from the group')
+        if msg.from_user.id not in admin_ids:
+            # Silently ignore /setlog command from non-admin
+            delete_message_safe(bot, msg)
+            pass
+        else:
+            bot.send_message(msg.chat.id, 'This command have to be called from the group')
         return
 
-    admins = bot.get_chat_administrators(msg.chat.id)
-    admin_ids = set([x.user.id for x in admins]) | set(SUPERUSER_IDS)
     if msg.from_user.id not in admin_ids:
-        bot.send_message(msg.chat.id, 'Access denied')
+        if msg.from_user.id not in admin_ids:
+            # Silently ignore /setlog command from non-admin
+            delete_message_safe(bot, msg)
+            pass
+        else:
+            bot.send_message(msg.chat.id, 'Access denied')
         return
 
     set_setting(db, GROUP_CONFIG, msg.chat.id, 'log_channel_id', None)
