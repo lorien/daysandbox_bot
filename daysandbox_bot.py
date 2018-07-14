@@ -74,6 +74,7 @@ The source code is available at [github.com/lorien/daysandbox_bot](https://githu
 [@nosticker_bot](https://t.me/nosticker_bot) - bot to delete stickers posted to group
 [@coinsignal_robot](https://t.me/coinsignal_robot) - bot to be notified when price of specific coin reaches the level you have set, also you can use this bot just to see price of coins.
 [@joinhider_bot](https://t.me/joinhider_bot) - bot to delete messages about user joined or left the chat
+[@watchdog_robot](https://t.me/watchdog_robot) - bot to delete stickers, file attachments, links, photos, videos and many other types of messages
 """
 SUPERUSER_IDS = set([
     46284539, # @madspectator
