@@ -1,4 +1,6 @@
 site_name: Daysandbox Bot
+theme: readthedocs
+use_directory_urls: false
 nav:
   - Index: index.md
   - FAQ: faq.md

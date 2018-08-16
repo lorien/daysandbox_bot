@@ -38,4 +38,8 @@ Use github issues: [github.com/lorien/daysandbox/issue](https://github.com/lorie
 
 ## How to contact with author of daysandbox?
 
-My email is `lorien @ lorien.name` (remove spaces)
+My email is [lorien@lorien.name](mailto:lorien@lorien.name)
+
+## Bot banned some user in my group by mistake
+
+Bot **does not** ban anobydoy. There is no such feature in the bot.

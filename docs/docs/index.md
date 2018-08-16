@@ -30,3 +30,7 @@ This instructions are specific too desktop telegram client. It could be a bit di
 * In the opened window set "Delete messages" permission (checkbox should be blue color) and unset all other permissions
   (checkboxes should be red)
 * Click "Save" 
+
+## Feedback
+
+Write me on [lorien@lorien.name](mailto:lorien@lorien.name)

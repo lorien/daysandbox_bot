@@ -13,3 +13,4 @@ pip-log.txt
 syntax:regexp
 ^var/
 ^.git/
+^docs/site/
