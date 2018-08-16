@@ -16,3 +16,6 @@ clean:
 init:
 	if [ ! -e var/run ]; then mkdir -p var/run; fi
 	if [ ! -e var/log ]; then mkdir -p var/log; fi
+
+gh-deploy:
+	cd docs && mkdocs gh-deploy
