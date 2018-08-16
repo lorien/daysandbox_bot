@@ -1,0 +1,4 @@
+site_name: Daysandbox Bot
+nav:
+  - Index: index.md
+  - FAQ: faq.md
