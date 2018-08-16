@@ -17,6 +17,10 @@ This bot does not ban anybody, it only deletes messages by the rules listed abov
 
 To get more help submit `/help` command to the bot.
 
+## Documentation and FAQ
+
+See [docs & FAQ](https://lorien.github.io/daysandbox_bot/index.html)
+
 
 ## Support
 
