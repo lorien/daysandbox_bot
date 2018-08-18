@@ -4,3 +4,4 @@ bottle
 gunicorn
 python-telegram-bot
 runscript
+redis

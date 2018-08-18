@@ -20,7 +20,7 @@ from telegram.ext.dispatcher import run_async
 
 from model import load_group_config
 from util import find_username_links, find_external_links, fetch_user_type
-from database import connect_db
+from database import connect_db, connect_redis_db
 
 HELP = """*DaySandBox Bot Help*
 
@@ -93,6 +93,7 @@ GLOBAL_LOG_CHANNEL_ID = {
 # Default time to reject link and forwarded posts from new user
 DEFAULT_SAFE_HOURS = 24
 db = connect_db()
+redis_db = connect_redis_db()
 
 # Some shitty global code
 JOINED_USERS = {}
@@ -232,6 +233,17 @@ def handle_start_help(bot, update):
                 else:
                     raise
 
+
+def format_size(val):
+    if val < 1024:
+        return val
+    elif val < (1024 * 1024):
+        return '%s Kb' % round(val / 1024, 1)
+    elif val < (1024 * 1024 * 1024):
+        return '%s Mb' % round(val / (1024 * 1204), 1)
+    else:
+        return '%s Gb' % round(val / (1024 * 1204 * 1024), 1)
+
 @run_async
 def handle_stat(bot, update):
     msg = update.effective_message
@@ -240,6 +252,8 @@ def handle_stat(bot, update):
     cnt = {
         'delete_msg': [],
         'chat': [],
+        'msg_hourly': [],
+        'msg_size_hourly': [],
     }
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     for x in range(7):
@@ -252,12 +266,33 @@ def handle_stat(bot, update):
             cnt['delete_msg'].insert(0, 'NA')
             cnt['chat'].insert(0, 'NA')
 
+    ts = datetime.utcnow()
+    for x in range(24):
+        hour_key = ts.strftime('%Y-%m-%dT%H:00:00')
+        cnt['msg_hourly'].insert(
+            0, redis_db.hget('stat-msg-hour', hour_key) or 0
+        )
+        ts -= timedelta(hours=1)
+
+    ts = datetime.utcnow()
+    for x in range(24):
+        hour_key = ts.strftime('%Y-%m-%dT%H:00:00')
+        size = int(redis_db.hget('stat-msg-size-hour', hour_key) or 0)
+        cnt['msg_size_hourly'].insert(
+            0, format_size(size) 
+        )
+        ts -= timedelta(hours=1)
+
     ret = '*Recent 7 days stat*\n'
     ret += '\n'
     ret += 'Deleted messages:\n'
     ret += ('    %s' % '|'.join(map(str, cnt['delete_msg']))) + '\n'
     ret += 'Affected chats:\n'
     ret += ('    %s' % '|'.join(map(str, cnt['chat']))) + '\n'
+    ret += 'All messages count (recent 24 hours):\n'
+    ret += ('    %s' % '|'.join(map(str, cnt['msg_hourly']))) + '\n'
+    ret += 'All messages size (recent 24 hours):\n'
+    ret += ('    %s' % '|'.join(map(str, cnt['msg_size_hourly']))) + '\n'
     bot.send_message(msg.chat.id, ret, parse_mode=ParseMode.MARKDOWN)
 
 @run_async
@@ -511,6 +546,13 @@ def handle_any_message(mode, bot, update):
     msg = update.effective_message
     if msg.chat.type in ('channel', 'private'):
         return
+
+    now = datetime.utcnow()
+    hour_key = now.strftime('%Y-%m-%dT%H:00:00')
+    minute_key = now.strftime('%Y-%m-%dT%H:%M:00')
+    redis_db.hincrby('stat-msg-hour', hour_key, 1)
+    redis_db.hincrby('stat-msg-minute', minute_key, 1)
+    redis_db.hincrby('stat-msg-size-hour', hour_key, len(msg.text or ''))
 
     to_delete, reason = get_delete_reason(msg)
     if to_delete:

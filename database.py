@@ -1,4 +1,5 @@
 from pymongo import MongoClient
+import redis
 
 
 def connect_db():
@@ -7,4 +8,9 @@ def connect_db():
     db.joined_user.create_index([('chat_id', 1), ('user_id', 1)])
     db.event.create_index([('type', 1), ('date', 1)])
     db.day_stat.create_index('date')
+    return db
+
+
+def connect_redis_db():
+    db = redis.Redis(db=1, decode_responses=True)
     return db
