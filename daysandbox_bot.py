@@ -87,7 +87,7 @@ SUPERUSER_IDS = set([
 GROUP_SETTING_KEYS = ('publog', 'log_channel_id', 'logformat', 'safe_hours')
 # Channel of global channel to translate ALL spam
 GLOBAL_LOG_CHANNEL_ID = {
-    'production': -1001148916224,
+    'production': None,
     'test': -1001318592769,
 }
 # Default time to reject link and forwarded posts from new user
@@ -575,7 +575,10 @@ def handle_any_message(mode, bot, update):
                     )
             DELETE_EVENTS[event_key] = datetime.utcnow()
 
-            ids = set([GLOBAL_LOG_CHANNEL_ID[mode]])
+            if GLOBAL_LOG_CHANNEL_ID[mode]:
+                ids = set([GLOBAL_LOG_CHANNEL_ID[mode]])
+            else:
+                ids = set()
             channel_id = get_setting(
                 GROUP_CONFIG, msg.chat.id, 'log_channel_id'
             )
