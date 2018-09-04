@@ -131,13 +131,14 @@ def delete_message_safe(bot, msg):
     try:
         bot.delete_message(msg.chat.id, msg.message_id)
     except Exception as ex:
+        ex_str = str(ex).lower()
         if (
-                'message to delete not found' in str(ex)
+                'message to delete not found' in ex_str
                 #or "message can\'t be deleted" in str(ex)
-                or "be deleted" in str(ex) # quick fix
-                or 'MESSAGE_ID_INVALID' in str(ex)
+                or "be deleted" in ex_str # quick fix
+                or 'message_id_invalid' in ex_str
             ):
-            pass
+            logging.error('Failed to delete message: %s' % ex)
         else:
             raise
 
@@ -220,18 +221,7 @@ def handle_start_help(bot, update):
                 '/start', '/start@daysandbox_bot', '/start@daysandbox_test_bot',
                 '/help', '/help@daysandbox_bot', '/help@daysandbox_test_bot'
             ):
-            try:
-                bot.delete_message(msg.chat.id, msg.message_id)
-            except Exception as ex:
-                if (
-                        'message to delete not found' in str(ex)
-                        #or "message can\'t be deleted" in str(ex)
-                        or "be deleted" in str(ex) # quick fix
-                        or 'MESSAGE_ID_INVALID' in str(ex)
-                    ):
-                    logging.error('Failed to delete command message: %s' % ex)
-                else:
-                    raise
+            delete_message_safe(bot, msg)
 
 
 def format_size(val):
@@ -507,13 +497,12 @@ def log_event_to_channel(bot, msg, reason, chid, formats):
                 'chat_id': msg.chat.id,
                 'msg_id': msg.message_id,
             })
+            ex_str = str(ex).lower()
             if (
-                    'MESSAGE_ID_INVALID' in str(ex) or
-                    'message to forward not found' in str(ex)
+                    'message_id_invalid' in ex_str
+                    or 'message to forward not found' in ex_str
                 ):
-                logging.error(
-                    'Failed to forward spam message: %s' % ex
-                )
+                logging.error('Failed to forward spam message: %s' % ex)
             else:
                 raise
     if 'json' in formats:
