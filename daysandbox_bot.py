@@ -67,7 +67,7 @@ text of message (or caption text of photo/video)
 
 *Questions, Feedback*
 
-Email: lorien@lorien.name
+Email: lorien @ lorien . name
 
 *Open Source*
 

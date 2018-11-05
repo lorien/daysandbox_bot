@@ -24,7 +24,7 @@ See [docs & FAQ](https://lorien.github.io/daysandbox_bot/index.html)
 
 ## Support
 
-* Email: lorien@lorien.name
+* Email: lorien @ lorien . name
 * Github issues to report bugs: [github issues](https://github.com/lorien/daysandbox_bot/issues)
 
 
