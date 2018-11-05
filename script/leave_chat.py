@@ -9,5 +9,6 @@ def setup_arg_parser(parser):
 
 
 def main(mode, chat_id, **kwargs):
-    bot = Bot(token=get_token('test'))
+    bot = Bot(token=get_token(mode))
+    print('Leaving chat id=%d' % chat_id)
     res = bot.leave_chat(chat_id)
