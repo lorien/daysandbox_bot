@@ -79,6 +79,7 @@ The source code is available at [github.com/lorien/daysandbox_bot](https://githu
 [@coinsignal_robot](https://t.me/coinsignal_robot) - bot to be notified when price of specific coin reaches the level you have set, also you can use this bot just to see price of coins.
 [@joinhider_bot](https://t.me/joinhider_bot) - bot to delete messages about user joined or left the chat
 [@watchdog_robot](https://t.me/watchdog_robot) - bot to delete stickers, file attachments, links, photos, videos and many other types of messages
+[@lang_blocker_bot](https://t.me/lang_blocker_bot) - bot to delete messages in particular languages configured by chat administrator 
 """
 SUPERUSER_IDS = set([
     46284539, # @madspectator
