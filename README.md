@@ -1,4 +1,15 @@
-## DaySandBox Bot Help
+## This is obsolete repository
+
+This repository contains a deprecated snapshot of bot's source base. I **keep** maintaining bot, I just closed its sources.
+
+Check out full list of my bots here: [tgdev.io](https://tgdev.io)
+
+Use telegram groups to ask questions or share your thougts:
+
+* [@tgdev_en](https://t.me/tgdev_en) - English speaking group
+* [@tgdev_ru](https://t.me/tgdev_ru) - Russian speaking group
+
+## About DaySandBox Bot
 
 This bot implements simple anti-spam technique - it deletes all posts which:
 1. contains link or mentions @username or been forwarded from somewhere
@@ -16,22 +27,3 @@ This bot does not ban anybody, it only deletes messages by the rules listed abov
 5. Enjoy!
 
 To get more help submit `/help` command to the bot.
-
-## Documentation and FAQ
-
-See [docs & FAQ](https://lorien.github.io/daysandbox_bot/index.html)
-
-
-## Support
-
-* Email: lorien @ lorien . name
-* Github issues to report bugs: [github issues](https://github.com/lorien/daysandbox_bot/issues)
-
-
-## My Other projects
-
-* [@nosticker_bot](https://t.me/nosticker_bot) - bot to delete stickers posted to group
-* [@coinsignal_robot](https://t.me/coinsignal_robot) - bot to be notified when price of specific coin reaches the level you have set, also you can use this bot just to see price of coins.
-* [@joinhider_bot](https://t.me/joinhider_bot) - bot to delete messages about user joined or left the chat
-* [@watchdog_robot](https://t.me/watchdog_robot) - bot to delete stickers, file attachments, links, photos, videos and many other types of messages
-* [@lang_blocker_bot](https://t.me/lang_blocker_bot) - bot to delete messages in particular languages configured by chat administrator 
